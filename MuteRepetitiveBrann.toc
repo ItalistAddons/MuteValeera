@@ -1,0 +1,19 @@
+## Interface: 120000
+## Title: Mute Repetitive Brann
+## Notes: Silences Brann Bronzebeard's voice lines during delves and adventures.
+## Version: 1.3.5
+## SavedVariables: MuteBrannSettings
+## Category: Expansion Features
+## Category-deDE: Erweiterungsfeatures
+## Category-esES: Características
+## Category-esMX: Características de expansiones
+## Category-frFR: Contenu d'extension
+## Category-itIT: Contenuti specifici
+## Category-koKR: 확장팩 특징
+## Category-ptBR: Características da Expansão
+## Category-ruRU: Особый контент
+## Category-zhCN: 特色更新
+## Category-zhTW: 資料片特色
+## Author: Italist
+
+MuteRepetitiveBrann.lua

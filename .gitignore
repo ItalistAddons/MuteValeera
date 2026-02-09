@@ -1,0 +1,22 @@
+# WoW SavedVariables
+*.lua.bak
+*.toc.bak
+
+# IDE / Editors
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# OS files
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Build artifacts
+release/
+*.zip
+
+# Packager files
+.release/
+.pkgmeta-*
