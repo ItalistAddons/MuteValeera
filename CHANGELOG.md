@@ -2,7 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-## [Unreleased]
+## [1.0.1] - 2026-03-02
 
 ### Changed
 - Relaxed the built-in Valeera audit rule to include audited `vo_120` companion files from Wago Tools pages `9` through `15` when they were updated after build `12.0.0.63534`
