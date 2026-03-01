@@ -3,7 +3,7 @@
 ## Notes: Silences Brann Bronzebeard's voice lines during delves and adventures.
 ## Version: 1.4.2
 ## Author: Italist
-## X-Curse-Project-ID: 1109833
+## X-Curse-Project-ID: 1102496
 ## X-Category: Audio & Video
 ## SavedVariables: MuteBrannSettings
 ## Category: Expansion Features
