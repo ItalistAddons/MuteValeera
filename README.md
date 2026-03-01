@@ -25,10 +25,11 @@ Silences Valeera Sanguinar's repetitive delve companion voice lines in World of 
 
 ## Default Scope
 
-- The built-in mute list is limited to Valeera Sanguinar delve-companion voice assets first introduced after build `12.0.0.63534`
+- The built-in mute list is limited to Valeera Sanguinar `vo_120` delve-companion voice assets from the Wago Tools `Valeera` file search on pages `9` through `15`
 - The initial candidate pool is the Wago Tools `Valeera` file search on pages `9` through `15`
-- That exact audit did not produce any files that met the rule `first version > 12.0.0.63534`
-- As a result, `1.0.0` ships with an empty built-in mute list and relies on the custom sound-ID workflow until verified post-`63534` Valeera lines are confirmed
+- The shipped built-in list keeps only entries that were updated after build `12.0.0.63534`
+- The current audit includes `150` verified file data IDs, all first seen in `12.0.0.63534` and updated in `12.0.0.64499`
+- Custom sound IDs remain available for anything outside that audited default set
 
 ## Commands
 
@@ -70,8 +71,8 @@ Silences Valeera Sanguinar's repetitive delve companion voice lines in World of 
 ## Release Process
 
 - Releases are tag-driven and automated
-- Pushing a tag that matches `v*` triggers GitHub Actions packaging and a GitHub release
-- This repository currently publishes GitHub releases only; CurseForge publishing is intentionally disabled until a real project exists
+- Pushing a tag that matches `v*` triggers GitHub Actions packaging, a GitHub release, and CurseForge publishing
+- CurseForge publishing targets project ID `1475450` when the repository secret `CF_API_KEY` is configured
 - Never commit tokens or place credentials in source files, tracked docs, issues, pull requests, or local config intended for commit
 - Local Windows dry-run packaging should use the official packager wrapper in `package.ps1`; see `PUBLISHING.md` for prerequisites and troubleshooting
 

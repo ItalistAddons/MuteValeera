@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Unreleased]
+
+### Changed
+- Relaxed the built-in Valeera audit rule to include audited `vo_120` companion files from Wago Tools pages `9` through `15` when they were updated after build `12.0.0.63534`
+- Added `150` verified Valeera file data IDs to the default mute list; each entry was first seen in `12.0.0.63534` and updated in `12.0.0.64499`
+- Enabled CurseForge publishing for project ID `1475450` in the tag-driven release pipeline
+
 ## [1.0.0] - 2026-03-01
 
 ### Added

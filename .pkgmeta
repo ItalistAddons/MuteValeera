@@ -2,6 +2,9 @@ package-as: MuteValeera
 
 enable-nolib-creation: no
 
+curseforge:
+  project-id: 1475450
+
 manual-changelog:
   filename: CHANGELOG.md
   markup-type: markdown

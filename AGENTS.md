@@ -12,16 +12,15 @@ This repository contains the World of Warcraft addon `MuteValeera`.
 - For versioned releases, keep the version in `MuteValeera.toc`, the tag, and the changelog aligned.
 - Do not commit packaged zip files, generated release output, WoW SavedVariables backups, or local editor/account state.
 - If you add files that should not ship in the packaged addon, update `.pkgmeta` ignore rules as part of the same change.
-- Keep the built-in mute list limited to Valeera Sanguinar delve-companion voice assets first introduced after build `12.0.0.63534`.
+- Keep the built-in mute list limited to Valeera Sanguinar `vo_120` delve-companion voice assets from the Wago Tools `Valeera` file search on pages `9` through `15` that were updated after build `12.0.0.63534`.
 - Use the Wago Tools `Valeera` file search on pages `9` through `15` as the first-pass candidate pool unless the repository owner explicitly expands it.
-- If a Valeera asset is ambiguous or predates `12.0.0.63534`, exclude it instead of guessing.
+- If a Valeera asset is ambiguous or not clearly companion VO, exclude it instead of guessing.
 
 ## Release Rules
 
 - Releases are triggered by pushing a git tag that matches `v*`.
-- GitHub Actions workflow `.github/workflows/release.yml` packages through `BigWigsMods/packager@v2` and creates GitHub releases.
-- CurseForge publishing is intentionally disabled until a real project exists.
-- If CurseForge support is added later, the GitHub Actions repository secret name must be `CF_API_KEY`.
+- GitHub Actions workflow `.github/workflows/release.yml` packages through `BigWigsMods/packager@v2`, creates GitHub releases, and publishes to CurseForge project `1475450`.
+- The GitHub Actions repository secret name for CurseForge publishing is `CF_API_KEY`.
 - Before tagging a release, confirm:
   - `MuteValeera.toc` has the intended version.
   - `CHANGELOG.md` includes the release notes.
@@ -51,7 +50,7 @@ This repository contains the World of Warcraft addon `MuteValeera`.
 
 - Never commit API keys, tokens, cookies, session exports, private URLs with embedded credentials, or screenshots/logs that reveal them.
 - Never place credentials directly in source files, `PUBLISHING.md`, PR descriptions, issues, commit messages, or local files intended for commit.
-- If CurseForge publishing is enabled later, the token belongs only in the GitHub Actions secret named `CF_API_KEY`.
+- The CurseForge token belongs only in the GitHub Actions secret named `CF_API_KEY`.
 - Treat `.env`, `.env.*`, key files, exported auth JSON, and local release notes containing secrets as non-committable.
 - If a secret is exposed or even suspected to be exposed:
   - stop using it;

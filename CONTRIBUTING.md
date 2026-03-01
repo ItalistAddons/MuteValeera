@@ -12,17 +12,18 @@ This repository contains the World of Warcraft addon `MuteValeera`.
 
 ## Valeera Data Scope
 
-- The built-in mute list must only contain Valeera Sanguinar delve-companion voice assets first introduced after build `12.0.0.63534`
+- The built-in mute list must only contain Valeera Sanguinar `vo_120` delve-companion voice assets from the audited Wago Tools candidate pool on pages `9` through `15`
 - The initial candidate pool for this repository is the Wago Tools `Valeera` file search on pages `9` through `15`
-- If a file is ambiguous, not clearly Valeera companion VO, or first appeared in `12.0.0.63534` or earlier, exclude it
+- Keep only files that were updated after build `12.0.0.63534`
+- If a file is ambiguous or not clearly Valeera companion VO, exclude it instead of guessing
 - Do not broaden the addon into "mute all Valeera" without an explicit design decision
 
 ## Release Workflow
 
 - Releases are tag-driven and automated
 - Pushing a tag that matches `v*` triggers `.github/workflows/release.yml`
-- GitHub Actions packages the addon and creates a GitHub release through the BigWigs packager
-- CurseForge publishing is not enabled in this repository until a real project exists
+- GitHub Actions packages the addon, creates a GitHub release, and publishes to CurseForge through the BigWigs packager
+- CurseForge publishing targets project ID `1475450` and uses the repository secret `CF_API_KEY`
 - Never commit tokens or place credentials in source files, docs, issues, pull requests, or tracked local config
 - CI is build-only and does not publish; publishing happens only on tagged releases
 
@@ -66,7 +67,7 @@ Configure branch protection for `main` in GitHub with these exact settings:
 
 - Never commit API keys, tokens, cookies, exported auth state, or private credential-bearing URLs
 - If you use a local `.env` file for packager testing, keep it untracked and never copy its contents into issues, PRs, or committed docs
-- If CurseForge publishing is enabled later, the approved GitHub Actions secret name is `CF_API_KEY`
+- The approved GitHub Actions secret name for CurseForge publishing is `CF_API_KEY`
 - If a secret is exposed or suspected to be exposed, revoke or rotate it immediately and remove it from pending commits without repeating the secret value
 
 ## Issues
