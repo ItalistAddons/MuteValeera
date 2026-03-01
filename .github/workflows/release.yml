@@ -3,20 +3,76 @@ name: Package and Release
 on:
   push:
     tags:
-      - 'v*'
+      - "v*"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
   release:
     runs-on: ubuntu-latest
-    
+    timeout-minutes: 15
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      
+
+      - name: Preflight release validation
+        shell: bash
+        env:
+          CF_API_KEY: ${{ secrets.CF_API_KEY }}
+          GITHUB_REF_NAME: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+
+          test -f MuteRepetitiveBrann.toc || {
+            echo "MuteRepetitiveBrann.toc was not found at repository root." >&2
+            exit 1
+          }
+
+          test -f .pkgmeta || {
+            echo ".pkgmeta was not found at repository root." >&2
+            exit 1
+          }
+
+          toc_version="$(sed -n 's/^## Version: //p' MuteRepetitiveBrann.toc | head -n1)"
+          if [ -z "$toc_version" ]; then
+            echo "Could not read ## Version from MuteRepetitiveBrann.toc." >&2
+            exit 1
+          fi
+
+          tag_version="${GITHUB_REF_NAME#v}"
+          if [ "$toc_version" != "$tag_version" ]; then
+            echo "Tag version ($tag_version) does not match TOC version ($toc_version)." >&2
+            exit 1
+          fi
+
+          if ! grep -q '^## X-Curse-Project-ID: [0-9][0-9]*$' MuteRepetitiveBrann.toc; then
+            echo "MuteRepetitiveBrann.toc is missing a valid ## X-Curse-Project-ID field." >&2
+            exit 1
+          fi
+
+          if [ -z "${CF_API_KEY:-}" ]; then
+            echo "CF_API_KEY is not configured for this repository." >&2
+            exit 1
+          fi
+
       - name: Package and release
         uses: BigWigsMods/packager@v2
         env:
           CF_API_KEY: ${{ secrets.CF_API_KEY }}
           GITHUB_OAUTH: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload packaged artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: MuteRepetitiveBrann-release-package
+          path: .release/*.zip
+          if-no-files-found: ignore

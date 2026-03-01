@@ -1,0 +1,122 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  validate-and-package:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Preflight packaging validation
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          import sys
+
+          toc_path = Path("MuteRepetitiveBrann.toc")
+          pkgmeta_path = Path(".pkgmeta")
+
+          if not toc_path.is_file():
+              sys.exit("MuteRepetitiveBrann.toc was not found at repository root.")
+          if not pkgmeta_path.is_file():
+              sys.exit(".pkgmeta was not found at repository root.")
+
+          lines = toc_path.read_text(encoding="utf-8", errors="replace").splitlines()
+          if not any(re.match(r"^## Interface:\s*\d+(\s*,\s*\d+)*\s*$", line) for line in lines):
+              sys.exit("TOC is missing a valid ## Interface field.")
+          if not any(re.match(r"^## Version:\s*.+\s*$", line) for line in lines):
+              sys.exit("TOC is missing a ## Version field.")
+
+          toc_entries = []
+          for raw_line in lines:
+              line = raw_line.strip()
+              if not line or line.startswith("##") or line.startswith("#"):
+                  continue
+              toc_entries.append(line)
+
+          if not toc_entries:
+              sys.exit("TOC does not list any runtime files.")
+
+          missing = [entry for entry in toc_entries if not Path(entry).exists()]
+          if missing:
+              sys.exit("Missing TOC entries: " + ", ".join(missing))
+          PY
+
+      - name: Build dry-run package
+        uses: BigWigsMods/packager@v2
+        with:
+          args: -d
+
+      - name: Validate packaged artifact contents
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import sys
+          import zipfile
+
+          zip_files = sorted(Path(".release").glob("*.zip"))
+          if not zip_files:
+              sys.exit("No zip artifact was generated in .release.")
+
+          archive = zip_files[0]
+          with zipfile.ZipFile(archive) as zf:
+              names = [name.rstrip("/") for name in zf.namelist() if name.strip()]
+
+          required = {
+              "MuteRepetitiveBrann/MuteRepetitiveBrann.toc",
+              "MuteRepetitiveBrann/MuteRepetitiveBrann.lua",
+          }
+          missing_required = sorted(required.difference(names))
+          if missing_required:
+              sys.exit("Package is missing required files: " + ", ".join(missing_required))
+
+          forbidden = {
+              ".github",
+              ".vscode",
+              "AGENTS.md",
+              "CHANGELOG.md",
+              "CODE_OF_CONDUCT.md",
+              "CONTRIBUTING.md",
+              "LICENSE",
+              "PUBLISHING.md",
+              "README.md",
+              "package.ps1",
+          }
+
+          violations = []
+          for name in names:
+              parts = [part for part in name.split("/") if part]
+              if any(part in forbidden for part in parts):
+                  violations.append(name)
+
+          if violations:
+              sys.exit("Package contains forbidden files: " + ", ".join(sorted(violations)))
+
+          print(f"Validated package: {archive}")
+          PY
+
+      - name: Upload zip artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: MuteRepetitiveBrann-ci-package
+          path: .release/*.zip
+          if-no-files-found: ignore

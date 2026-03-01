@@ -1,10 +1,13 @@
-# WoW SavedVariables
+# WoW SavedVariables / backups
 *.lua.bak
 *.toc.bak
 
 # IDE / Editors
 .vscode/
+.vs/
 .idea/
+.history/
+*.code-workspace
 *.sublime-project
 *.sublime-workspace
 
@@ -15,8 +18,12 @@ Desktop.ini
 
 # Build artifacts
 release/
+.release/
 *.zip
 
+# Local packager env
+.env
+.env.*
+
 # Packager files
-.release/
 .pkgmeta-*

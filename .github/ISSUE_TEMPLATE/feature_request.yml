@@ -1,0 +1,51 @@
+name: Feature request
+description: Suggest an improvement to the addon or its release workflow
+title: "[Feature]: "
+labels:
+  - enhancement
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Do not include tokens or secrets.
+        Do not propose storing CurseForge credentials in tracked files.
+        If this request affects publishing, it must preserve the tag-driven GitHub Actions release flow and the `CF_API_KEY` secret usage.
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: Short description of the improvement.
+    validations:
+      required: true
+  - type: textarea
+    id: use_case
+    attributes:
+      label: Problem or use case
+      description: What problem are you trying to solve?
+    validations:
+      required: true
+  - type: textarea
+    id: proposed_behavior
+    attributes:
+      label: Proposed behavior
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+    validations:
+      required: false
+  - type: textarea
+    id: impact
+    attributes:
+      label: Scope or impact
+      description: Expected behavior, user impact, or release/process impact.
+    validations:
+      required: false
+  - type: textarea
+    id: additional_context
+    attributes:
+      label: Additional context
+    validations:
+      required: false

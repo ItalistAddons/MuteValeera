@@ -1,121 +1,86 @@
-# Publishing to CurseForge - Setup Guide
+# Publishing
 
-## Repository is Ready! ✅
+This repository publishes from GitHub to CurseForge through tag-driven GitHub Actions automation.
 
-Git repository initialized with:
-- ✅ `.gitignore` for WoW addon development
-- ✅ `.pkgmeta` for CurseForge packaging
-- ✅ GitHub Actions workflow for automated releases
-- ✅ `README.md` with feature documentation
-- ✅ `CHANGELOG.md` tracking all changes
-- ✅ `LICENSE` (MIT)
-- ✅ Initial commit to `main` branch
+## Repository
 
-## Next Steps
+- GitHub: `https://github.com/ItalistAddons/MuteRepetitiveBrann`
+- Issues: `https://github.com/ItalistAddons/MuteRepetitiveBrann/issues`
+- CurseForge: `https://www.curseforge.com/wow/addons/mute-repetitive-brann`
 
-### 1. Create GitHub Repository
+## Release Model
 
-1. Go to https://github.com/new
-2. Name: `MuteRepetitiveBrann`
-3. **Do NOT** initialize with README/license (we already have them)
-4. Create repository
-5. Copy the remote URL (e.g., `https://github.com/yourusername/MuteRepetitiveBrann.git`)
+- Releases are tag-driven and automated.
+- Pushing a tag that matches `v*` triggers `.github/workflows/release.yml`.
+- The release workflow uses `BigWigsMods/packager@v2`.
+- CurseForge publishing uses the GitHub Actions repository secret `CF_API_KEY`.
+- Never commit tokens. Do not place CurseForge credentials in tracked files, PR text, issues, or local config intended for commit.
 
-### 2. Push Your Code
+## Maintainer Setup
 
-Run these commands in your terminal:
+1. Generate a CurseForge API token at `https://www.curseforge.com/account/api-tokens`.
+2. In the GitHub repository, open `Settings -> Secrets and variables -> Actions`.
+3. Add a repository secret named `CF_API_KEY`.
+4. Do not rename the secret unless the workflows and documentation are updated in the same change.
 
-```powershell
-cd "c:\Program Files (x86)\World of Warcraft\_retail_\Interface\AddOns\MuteRepetitiveBrann"
-git remote add origin https://github.com/YOURUSERNAME/MuteRepetitiveBrann.git
-git branch -M main
-git push -u origin main
-```
+## Release Checklist
 
-Replace `YOURUSERNAME` with your actual GitHub username.
-
-### 3. Setup CurseForge API Key
-
-1. Go to https://www.curseforge.com/account/api-tokens
-2. Click "Generate Token"
-3. Name: `GitHub Actions - MuteRepetitiveBrann`
-4. Copy the token (you'll only see it once!)
-
-### 4. Add Secret to GitHub
-
-1. Go to your GitHub repo → Settings → Secrets and variables → Actions
-2. Click "New repository secret"
-3. Name: `CF_API_KEY`
-4. Value: Paste your CurseForge API token
-5. Click "Add secret"
-
-### 5. Create Your First Release
-
-When you're ready to publish an update:
+1. Update `MuteRepetitiveBrann.toc` so `## Version:` matches the intended release.
+2. Update `CHANGELOG.md`.
+3. Confirm `.pkgmeta` still excludes non-runtime files.
+4. Confirm CI passed on the commit you are tagging.
+5. Create and push the tag:
 
 ```powershell
-cd "c:\Program Files (x86)\World of Warcraft\_retail_\Interface\AddOns\MuteRepetitiveBrann"
-
-# Make your changes, then commit them
-git add -A
-git commit -m "Description of changes"
-
-# Create and push a version tag (this triggers the release)
-git tag v1.4.0
+git tag v1.4.2
 git push origin main --tags
 ```
 
-**The GitHub Action will automatically:**
-- Package your addon using BigWigs packager
-- Create a GitHub Release
-- Upload to CurseForge
-- Include your CHANGELOG.md in the release notes
+## What the Release Workflow Does
 
-### 6. Future Updates
+- validates the root `MuteRepetitiveBrann.toc`
+- validates the tag version against `## Version:`
+- confirms `.pkgmeta` is present
+- confirms `## X-Curse-Project-ID:` is present in the TOC
+- confirms `CF_API_KEY` is available
+- packages the addon with the BigWigs packager
+- creates or updates the GitHub release
+- uploads the packaged addon to CurseForge
+- uploads the generated `.release/*.zip` as a diagnostic GitHub Actions artifact
 
-For each new version:
+## CI vs Release
 
-1. Update `MuteRepetitiveBrann.toc` with new `## Version:`
-2. Add changes to `CHANGELOG.md`
-3. Commit changes:
-   ```powershell
-   git add -A
-   git commit -m "v1.4.1 - Bug fixes"
-   ```
-4. Tag and push:
-   ```powershell
-   git tag v1.4.1
-   git push origin main --tags
-   ```
+- `.github/workflows/ci.yml` is build-only.
+- CI packages with the same packager in dry-run mode and uploads the built zip as a workflow artifact.
+- CI does not publish to CurseForge.
+- Tagged releases are the only publishing path.
 
-### Troubleshooting
+## Local Dry-Run Packaging
 
-**GitHub Action fails:**
-- Check your `CF_API_KEY` secret is correct
-- Verify the token has "Upload Files" permission on CurseForge
-- Check the Actions tab on GitHub for error logs
-
-**Packager warnings:**
-- The packager will automatically:
-  - Respect `.pkgmeta` ignore list
-  - Handle TOC file processing
-  - Skip development files
-
-**Update README.md URLs:**
-- Replace `https://github.com/yourusername/` with your actual URLs
-- Update CurseForge project link once created
-
-## Testing Locally
-
-To test packaging without publishing:
+Use the repository wrapper:
 
 ```powershell
-# Install the packager (requires bash/WSL on Windows)
-curl -s https://raw.githubusercontent.com/BigWigsMods/packager/master/release.sh | bash -s -- -d
+powershell -ExecutionPolicy Bypass -File .\package.ps1
 ```
 
-This creates a zip file you can test before pushing tags.
+This wrapper uses the official BigWigs packager in dry-run mode and writes output under `.release/`.
 
----
+## Windows Troubleshooting
 
-**Your addon is now ready for automated CurseForge releases! 🎉**
+- Install WSL or Git Bash. `package.ps1` requires one of them because the official packager is a shell script.
+- Run the command from the repository root.
+- This repository path contains spaces and parentheses, so keep the path quoted if you run commands manually.
+- If the wrapper reports missing prerequisites, install WSL or Git Bash and try again.
+- If packaging fails, compare the local `.release/` contents with the zip artifact from the latest CI run.
+- If a local `.env` file is used for packager testing, keep it untracked and never commit it.
+- Never place the CurseForge token in source files, docs, or tracked config. Automation uses only the GitHub secret `CF_API_KEY`.
+
+## Direct Packager Invocation
+
+If you need to run the packager manually from a Unix-like shell:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/BigWigsMods/packager/master/release.sh | bash -s -- -d
+```
+
+Run that command from the repository root so the packager finds `.pkgmeta` and the root TOC.

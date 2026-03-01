@@ -20,6 +20,7 @@ Silences Brann Bronzebeard's repetitive voice lines during delves and adventures
 ## Commands
 
 ### Basic
+
 - `/mutebrann` or `/mb` - Show help
 - `/mutebrann on` - Enable muting
 - `/mutebrann off` - Disable muting
@@ -30,6 +31,7 @@ Silences Brann Bronzebeard's repetitive voice lines during delves and adventures
 - `/mutebrann ui` - Open settings panel
 
 ### Custom Sound IDs
+
 - `/mutebrann add <ids>` - Add custom sound IDs (comma/space-separated)
 - `/mutebrann del <ids>` - Remove custom sound IDs
 - `/mutebrann list` - Show all custom sound IDs
@@ -37,13 +39,14 @@ Silences Brann Bronzebeard's repetitive voice lines during delves and adventures
 - `/mutebrann validate` - Check custom IDs for issues
 
 ### Advanced
+
 - `/mutebrann export` - Copy custom IDs for backup/sharing
 - `/mutebrann import <ids>` - Import custom IDs from string
 - `/mutebrann helpfull` - Detailed command help
 
 ## Examples
 
-```
+```text
 /mb on
 /mutebrann add 12345,67890
 /mutebrann add 111 222 333
@@ -51,11 +54,24 @@ Silences Brann Bronzebeard's repetitive voice lines during delves and adventures
 /mutebrann export
 ```
 
+## Release Process
+
+- Releases are tag-driven and automated.
+- Pushing a tag that matches `v*` triggers GitHub Actions packaging and publishing.
+- CurseForge publishing uses the GitHub Actions repository secret `CF_API_KEY`.
+- Never commit tokens or place CurseForge credentials in source files, tracked docs, issues, pull requests, or local config intended for commit.
+- Local Windows dry-run packaging should use the official packager wrapper in `package.ps1`. See `PUBLISHING.md` for prerequisites and troubleshooting.
+
+## Contributing
+
+- Contributor guidance: [CONTRIBUTING.md](CONTRIBUTING.md)
+- Publishing and Windows troubleshooting: [PUBLISHING.md](PUBLISHING.md)
+
 ## Support
 
-- **Issues**: [GitHub Issues](https://github.com/yourusername/MuteRepetitiveBrann/issues)
+- **Issues**: [GitHub Issues](https://github.com/ItalistAddons/MuteRepetitiveBrann/issues)
 - **CurseForge**: [Project Page](https://www.curseforge.com/wow/addons/mute-repetitive-brann)
 
 ## License
 
-All Rights Reserved © 2024-2026 Italist
+All Rights Reserved (c) 2024-2026 Italist

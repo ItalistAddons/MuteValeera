@@ -1,0 +1,74 @@
+name: Bug report
+description: Report a defect or regression in the addon
+title: "[Bug]: "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Do not include tokens, API keys, or private account/session data.
+        If this issue involves publishing, say whether it affects the tag-driven GitHub Actions release flow.
+  - type: input
+    id: addon_version
+    attributes:
+      label: Addon version
+      description: The version shown in the TOC or in game.
+      placeholder: 1.4.1
+    validations:
+      required: true
+  - type: input
+    id: wow_version
+    attributes:
+      label: WoW version or build
+      description: Retail build, region, or patch if known.
+      placeholder: 11.x / retail
+    validations:
+      required: false
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: Short description of the defect.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: List the shortest reliable reproduction steps.
+    validations:
+      required: true
+  - type: textarea
+    id: errors
+    attributes:
+      label: Lua errors or logs
+      description: Paste errors or logs if available. Remove any private information first.
+      render: text
+    validations:
+      required: false
+  - type: textarea
+    id: media
+    attributes:
+      label: Screenshots or video
+      description: Links or screenshots that help show the problem.
+    validations:
+      required: false
+  - type: textarea
+    id: additional_context
+    attributes:
+      label: Additional context
+    validations:
+      required: false

@@ -1,75 +1,158 @@
-# Manual Packaging Script for MuteRepetitiveBrann
-# Creates a CurseForge-ready zip file
+# Local packaging wrapper for the official BigWigs packager.
 
 param(
-    [string]$OutputDir = ".\release"
+    [string]$OutputDir = ".\.release"
 )
 
 $ErrorActionPreference = "Stop"
 
-# Get version from TOC file
-$tocFile = ".\MuteRepetitiveBrann.toc"
-$version = (Select-String -Path $tocFile -Pattern "^## Version: (.+)$").Matches.Groups[1].Value.Trim()
+function Get-FullPath {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Path,
+        [Parameter(Mandatory = $true)]
+        [string]$BasePath
+    )
 
-if (-not $version) {
-    Write-Error "Could not find version in $tocFile"
-    exit 1
-}
-
-Write-Host "Packaging MuteRepetitiveBrann v$version..." -ForegroundColor Cyan
-
-# Create output directory
-if (-not (Test-Path $OutputDir)) {
-    New-Item -ItemType Directory -Path $OutputDir | Out-Null
-}
-
-$tempDir = Join-Path $OutputDir "temp"
-$addonDir = Join-Path $tempDir "MuteRepetitiveBrann"
-$zipFile = Join-Path $OutputDir "MuteRepetitiveBrann-$version.zip"
-
-# Clean up old temp and zip
-if (Test-Path $tempDir) {
-    Remove-Item -Recurse -Force $tempDir
-}
-if (Test-Path $zipFile) {
-    Remove-Item -Force $zipFile
-    Write-Host "Removed existing: $zipFile" -ForegroundColor Yellow
-}
-
-# Create addon directory structure
-New-Item -ItemType Directory -Path $addonDir -Force | Out-Null
-
-# Files to include (only essential addon files)
-$filesToCopy = @(
-    "MuteRepetitiveBrann.lua",
-    "MuteRepetitiveBrann.toc",
-    "README.md",
-    "LICENSE"
-)
-
-
-# Copy files
-foreach ($file in $filesToCopy) {
-    if (Test-Path $file) {
-        Copy-Item $file -Destination $addonDir
-        Write-Host "  + $file" -ForegroundColor Green
-    } else {
-        Write-Warning "File not found: $file"
+    if ([System.IO.Path]::IsPathRooted($Path)) {
+        return [System.IO.Path]::GetFullPath($Path)
     }
+
+    return [System.IO.Path]::GetFullPath((Join-Path $BasePath $Path))
 }
 
-# Create zip archive
-Write-Host "`nCreating archive..." -ForegroundColor Cyan
-Compress-Archive -Path $addonDir -DestinationPath $zipFile -CompressionLevel Optimal
+function Escape-BashLiteral {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Value
+    )
 
-# Clean up temp directory
-Remove-Item -Recurse -Force $tempDir
+    $replacement = "'" + '"' + "'" + '"' + "'"
+    return "'" + ($Value -replace "'", $replacement) + "'"
+}
 
-# Show result
-$zipSize = (Get-Item $zipFile).Length / 1KB
-Write-Host "`nPackage created successfully!" -ForegroundColor Green
-Write-Host "  File: $zipFile" -ForegroundColor White
-Write-Host "  Size: $([math]::Round($zipSize, 2)) KB" -ForegroundColor White
-Write-Host "  Version: $version" -ForegroundColor White
+function New-PackagerScript {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$RepoRootUnix,
+        [Parameter(Mandatory = $true)]
+        [string]$ReleaseDirUnix
+    )
 
-Write-Host "`nReady to upload to CurseForge!" -ForegroundColor Cyan
+    $script = @'
+set -euo pipefail
+tmp_dir=$(mktemp -d)
+trap 'rm -rf "$tmp_dir"' EXIT
+curl -fsSL __PACKAGER_URL__ -o "$tmp_dir/release.sh"
+chmod +x "$tmp_dir/release.sh"
+cd __REPO_ROOT__
+"$tmp_dir/release.sh" -d -r __RELEASE_DIR__
+'@
+
+    $script = $script.Replace("__PACKAGER_URL__", (Escape-BashLiteral "https://raw.githubusercontent.com/BigWigsMods/packager/master/release.sh"))
+    $script = $script.Replace("__REPO_ROOT__", (Escape-BashLiteral $RepoRootUnix))
+    $script = $script.Replace("__RELEASE_DIR__", (Escape-BashLiteral $ReleaseDirUnix))
+    return $script
+}
+
+function Try-InvokeWslPackager {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$RepoRoot,
+        [Parameter(Mandatory = $true)]
+        [string]$ReleaseDir
+    )
+
+    $wsl = Get-Command wsl.exe -ErrorAction SilentlyContinue
+    if (-not $wsl) {
+        return $false
+    }
+
+    & $wsl.Source -e bash -lc "command -v curl >/dev/null && command -v zip >/dev/null"
+    if ($LASTEXITCODE -ne 0) {
+        return $false
+    }
+
+    $repoRootUnix = (& $wsl.Source wslpath -a $RepoRoot | Out-String).Trim()
+    $releaseDirUnix = (& $wsl.Source wslpath -a $ReleaseDir | Out-String).Trim()
+    $script = New-PackagerScript -RepoRootUnix $repoRootUnix -ReleaseDirUnix $releaseDirUnix
+
+    Write-Host "Running official packager through WSL..." -ForegroundColor Cyan
+    & $wsl.Source -e bash -lc $script
+    if ($LASTEXITCODE -ne 0) {
+        throw "The official packager failed while running under WSL."
+    }
+
+    return $true
+}
+
+function Try-InvokeGitBashPackager {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$RepoRoot,
+        [Parameter(Mandatory = $true)]
+        [string]$ReleaseDir
+    )
+
+    $bash = Get-Command bash.exe -ErrorAction SilentlyContinue
+    if (-not $bash) {
+        $bash = Get-Command bash -ErrorAction SilentlyContinue
+    }
+
+    if (-not $bash) {
+        return $false
+    }
+
+    & $bash.Source -lc "command -v curl >/dev/null && command -v zip >/dev/null && command -v cygpath >/dev/null"
+    if ($LASTEXITCODE -ne 0) {
+        return $false
+    }
+
+    $repoRootUnix = (& $bash.Source -lc ("cygpath -au " + (Escape-BashLiteral $RepoRoot)) | Out-String).Trim()
+    $releaseDirUnix = (& $bash.Source -lc ("cygpath -au " + (Escape-BashLiteral $ReleaseDir)) | Out-String).Trim()
+    $script = New-PackagerScript -RepoRootUnix $repoRootUnix -ReleaseDirUnix $releaseDirUnix
+
+    Write-Host "Running official packager through Git Bash..." -ForegroundColor Cyan
+    & $bash.Source -lc $script
+    if ($LASTEXITCODE -ne 0) {
+        throw "The official packager failed while running under Git Bash."
+    }
+
+    return $true
+}
+
+if (-not (Test-Path ".\MuteRepetitiveBrann.toc")) {
+    throw "MuteRepetitiveBrann.toc was not found at repository root."
+}
+
+$repoRoot = Split-Path -Parent $PSCommandPath
+$releaseDir = Get-FullPath -Path $OutputDir -BasePath $repoRoot
+
+if (-not (Test-Path $releaseDir)) {
+    New-Item -ItemType Directory -Path $releaseDir -Force | Out-Null
+}
+
+Push-Location $repoRoot
+try {
+    $invoked = Try-InvokeWslPackager -RepoRoot $repoRoot -ReleaseDir $releaseDir
+    if (-not $invoked) {
+        $invoked = Try-InvokeGitBashPackager -RepoRoot $repoRoot -ReleaseDir $releaseDir
+    }
+
+    if (-not $invoked) {
+        throw @"
+The official packager requires WSL or Git Bash on Windows.
+
+Install one of the following, then run this command again from the repository root:
+  powershell -ExecutionPolicy Bypass -File .\package.ps1
+
+This wrapper downloads and runs the official BigWigs packager in dry-run mode, writing output to:
+  $releaseDir
+"@
+    }
+
+    Write-Host "`nPackaging complete. Inspect the output under $releaseDir" -ForegroundColor Green
+}
+finally {
+    Pop-Location
+}
