@@ -11,13 +11,13 @@ Describe what changed and why.
 ## Release and Docs
 
 - [ ] Updated `CHANGELOG.md` for user-facing changes
-- [ ] Updated `MuteRepetitiveBrann.toc` version if this is release prep
+- [ ] Updated `MuteValeera.toc` version if this is release prep
 - [ ] Reviewed `.pkgmeta` if files were added, removed, or renamed
 
 ## Security
 
 - [ ] No tokens, secrets, or private auth data are included
-- [ ] CurseForge credentials were not committed and must only be stored in the GitHub Actions secret `CF_API_KEY`
+- [ ] No credentials were committed; if CurseForge publishing is enabled later, use only the GitHub Actions secret `CF_API_KEY`
 
 ## Notes
 

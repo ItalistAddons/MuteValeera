@@ -1,11 +1,10 @@
 ## Interface: 120001
-## Title: Mute Repetitive Brann
-## Notes: Silences Brann Bronzebeard's voice lines during delves and adventures.
-## Version: 1.4.3
+## Title: Mute Valeera
+## Notes: Silences Valeera Sanguinar's repetitive delve companion voice lines.
+## Version: 1.0.0
 ## Author: Italist
-## X-Curse-Project-ID: 1102496
 ## X-Category: Audio & Video
-## SavedVariables: MuteBrannSettings
+## SavedVariables: MuteValeeraSettings
 ## Category: Expansion Features
 ## Category-deDE: Erweiterungsfeatures
 ## Category-esES: Características
@@ -18,4 +17,4 @@
 ## Category-zhCN: 特色更新
 ## Category-zhTW: 資料片特色
 
-MuteRepetitiveBrann.lua
+MuteValeera.lua

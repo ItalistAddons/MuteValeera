@@ -121,8 +121,8 @@ function Try-InvokeGitBashPackager {
     return $true
 }
 
-if (-not (Test-Path ".\MuteRepetitiveBrann.toc")) {
-    throw "MuteRepetitiveBrann.toc was not found at repository root."
+if (-not (Test-Path ".\MuteValeera.toc")) {
+    throw "MuteValeera.toc was not found at repository root."
 }
 
 $repoRoot = Split-Path -Parent $PSCommandPath

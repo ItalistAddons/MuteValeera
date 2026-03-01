@@ -14,7 +14,7 @@ body:
     attributes:
       label: Addon version
       description: The version shown in the TOC or in game.
-      placeholder: 1.4.1
+      placeholder: 1.0.0
     validations:
       required: true
   - type: input
@@ -22,7 +22,7 @@ body:
     attributes:
       label: WoW version or build
       description: Retail build, region, or patch if known.
-      placeholder: 11.x / retail
+      placeholder: 12.x / retail
     validations:
       required: false
   - type: textarea

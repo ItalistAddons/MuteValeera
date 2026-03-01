@@ -8,8 +8,8 @@ body:
     attributes:
       value: |
         Do not include tokens or secrets.
-        Do not propose storing CurseForge credentials in tracked files.
-        If this request affects publishing, it must preserve the tag-driven GitHub Actions release flow and the `CF_API_KEY` secret usage.
+        Do not propose storing credentials in tracked files.
+        If this request affects publishing, it must preserve the tag-driven GitHub Actions release flow.
   - type: textarea
     id: summary
     attributes:

@@ -29,15 +29,15 @@ local function SetSoundMuted(soundId, shouldMute)
 
   if not warnedMissingSoundAPI then
     warnedMissingSoundAPI = true
-    print("MuteBrann: Sound mute API is unavailable on this client. Muting is temporarily disabled.")
+    print("MuteValeera: Sound mute API is unavailable on this client. Muting is temporarily disabled.")
   end
 
   return false
 end
 
 -- SavedVariables
-MuteBrannSettings = MuteBrannSettings or {}
-local settings = MuteBrannSettings
+MuteValeeraSettings = MuteValeeraSettings or {}
+local settings = MuteValeeraSettings
 
 -- State variables
 local isMuted, muteCritical
@@ -51,34 +51,16 @@ local DEFAULTS = {
   customList = {},
 }
 
--- Base (non-critical) Brann sound IDs
-local baseMuteList = {
-  5768798, 5768799, 5768800, 5768801, 5768802, 5768803, 5768804, 5768805,
-  5768806, 5768807, 5768808, 5768809, 5768810, 5768811, 5768812, 5768813,
-  5768814, 5768815, 5768816, 5768817, 5768818, 5768819, 5768820, 5768821,
-  5768822, 5768823, 5768824, 5768825, 5768826, 5768827, 5768828, 5768829,
-  5768833, 5768839, 5768840, 5768841, 5768842, 5768849, 5768962, 5768963,
-  5768964, 5768965, 5768966, 5768967, 5768968, 5768969, 5768970, 5768971,
-  5768972, 5768973, 5768974, 5768975, 5768976, 5768977, 5768978, 5768979,
-  5769016, 5769031, 5769032, 5769033, 5769034, 5769035, 5769036, 5769037,
-  5769038, 5769039, 5769058, 5769067, 5769068, 5769069, 5769070, 5769071,
-  5769072, 5769073, 5769074, 5769075,
-  6244301,
-  6715140, 6715145, 6716653, 6716655, 6716656, 6716665, 6716666,
-}
+-- Built-in Valeera sound IDs are intentionally empty for now.
+-- The initial candidate pool was the Wago Tools Valeera file search on pages 9-15,
+-- filtered to files first introduced after build 12.0.0.63534. No entries met that rule.
+local baseMuteList = {}
 
--- Critical Brann lines (unchanged)
-local criticalMuteList = {
-  5768836, 5768837, 5768838,
-  5769017, 5769018, 5769019, 5769020,
-  5769059, 5769060,
-}
+-- Keep the partial/full UX intact even though no verified critical subset exists yet.
+local criticalMuteList = {}
 
--- Known Brann NPC IDs for locale-independent tooltip detection
-local BRANN_NPC_IDS = {
-  [226517] = true,   -- Delves companion (TWW)
-  [186966] = true,   -- Explorer Brann (generic)
-}
+-- Tooltip status is disabled until Valeera companion NPC IDs are confirmed safely.
+local VALEERA_NPC_IDS = {}
 
 -- Input validation and sanitization helpers
 local function ValidateSoundId(idStr)
@@ -222,7 +204,7 @@ local function InitializeSettings()
 
   if oldVersion ~= ADDON_VERSION then
     settings.version = ADDON_VERSION
-    print(("MuteBrann: Settings updated to version %s"):format(ADDON_VERSION))
+    print(("MuteValeera: Settings updated to version %s"):format(ADDON_VERSION))
   end
   
   -- Cache settings locally for performance
@@ -279,13 +261,13 @@ end
 
 local function TryOpenSettingsCategory()
   if not (settingsCategory and Settings and Settings.OpenToCategory) then
-    print("MuteBrann: Settings panel not available on this client.")
+    print("MuteValeera: Settings panel not available on this client.")
     return
   end
 
   local categoryID = settingsCategory.GetID and settingsCategory:GetID() or settingsCategory
   if type(categoryID) ~= "number" then
-    print("MuteBrann: Settings panel is available, but the category could not be resolved.")
+    print("MuteValeera: Settings panel is available, but the category could not be resolved.")
     return
   end
 
@@ -295,7 +277,7 @@ end
 -- Command handling with better error checking
 local function HandleSlashCommand(msg)
   if not isInitialized then
-    print("MuteBrann: Addon not yet initialized. Please try again.")
+    print("MuteValeera: Addon not yet initialized. Please try again.")
     return
   end
   
@@ -309,28 +291,28 @@ local function HandleSlashCommand(msg)
   
   if cmd == "on" or cmd == "mute" then
     settings.isMuted, isMuted = true, true
-    print("MuteBrann: Brann muted.")
+    print("MuteValeera: Valeera muted.")
     
   elseif cmd == "off" or cmd == "unmute" then
     settings.isMuted, isMuted = false, false
-    print("MuteBrann: Brann unmuted.")
+    print("MuteValeera: Valeera unmuted.")
     
   elseif cmd == "toggle" then
     isMuted = not isMuted
     settings.isMuted = isMuted
-    print(("MuteBrann: Mute toggled %s"):format(isMuted and "ON" or "OFF"))
+    print(("MuteValeera: Mute toggled %s"):format(isMuted and "ON" or "OFF"))
     
   elseif cmd == "full" then
     settings.muteCritical, muteCritical = true, true
-    print("MuteBrann: Critical lines now muted.")
+    print("MuteValeera: Critical lines now muted.")
     
   elseif cmd == "partial" then
     settings.muteCritical, muteCritical = false, false
-    print("MuteBrann: Partial mute enabled (critical lines allowed).")
+    print("MuteValeera: Partial mute enabled (critical lines allowed).")
     
   elseif cmd == "status" then
     local muteCount = #GetFinalMuteList()
-    print(("MuteBrann Status — Mute: %s, Critical mute: %s, Total sounds muted: %d"):format(
+    print(("MuteValeera Status - Mute: %s, Critical mute: %s, Total sounds muted: %d"):format(
       isMuted and "ON" or "OFF", 
       muteCritical and "YES" or "NO",
       isMuted and muteCount or 0
@@ -339,17 +321,17 @@ local function HandleSlashCommand(msg)
     
   elseif cmd == "add" then
     if rest == "" then
-      print("MuteBrann: Please specify sound IDs to add")
-      print("  Examples: /mutebrann add 12345")
-      print("           /mutebrann add 12345,67890,11111")
-      print("           /mutebrann add 12345 67890 11111")
+      print("MuteValeera: Please specify sound IDs to add")
+      print("  Examples: /mutevaleera add 12345")
+      print("           /mutevaleera add 12345,67890,11111")
+      print("           /mutevaleera add 12345 67890 11111")
       return
     end
     
     local parseResults = ParseIdList(rest)
     
     if parseResults.empty then
-      print("MuteBrann: No sound IDs found to add.")
+      print("MuteValeera: No sound IDs found to add.")
       return
     end
     
@@ -387,7 +369,7 @@ local function HandleSlashCommand(msg)
     
     -- Provide comprehensive feedback
     local totalProcessed = #parseResults.valid + #parseResults.invalid
-    print(("MuteBrann: Processed %d sound ID%s:"):format(totalProcessed, totalProcessed == 1 and "" or "s"))
+    print(("MuteValeera: Processed %d sound ID%s:"):format(totalProcessed, totalProcessed == 1 and "" or "s"))
     
     if #added > 0 then
       local ids = {}
@@ -466,7 +448,7 @@ local function HandleSlashCommand(msg)
         print(("    ID %d: %s"):format(warning.id, tconcat(warning.warnings, ", ")))
       end
     elseif #warnings > 5 then
-      print(("  ⚠ %d sound IDs have potential issues (use '/mutebrann validate' for details)"):format(#warnings))
+      print(("  Warning: %d sound IDs have potential issues (use '/mutevaleera validate' for details)"):format(#warnings))
     end
     
     -- Summary
@@ -484,14 +466,14 @@ local function HandleSlashCommand(msg)
     
   elseif cmd == "del" or cmd == "remove" then
     if rest == "" then
-      print("MuteBrann: Please specify sound IDs to remove (e.g., /mutebrann del 12345,67890)")
+      print("MuteValeera: Please specify sound IDs to remove (e.g., /mutevaleera del 12345,67890)")
       return
     end
     
     local parseResults = ParseIdList(rest)
     
     if parseResults.empty then
-      print("MuteBrann: No sound IDs found to remove.")
+      print("MuteValeera: No sound IDs found to remove.")
       return
     end
     
@@ -510,7 +492,7 @@ local function HandleSlashCommand(msg)
     
     -- Provide detailed feedback
     local totalProcessed = #parseResults.valid + #parseResults.invalid
-    print(("MuteBrann: Processed %d sound ID%s for removal:"):format(totalProcessed, totalProcessed == 1 and "" or "s"))
+    print(("MuteValeera: Processed %d sound ID%s for removal:"):format(totalProcessed, totalProcessed == 1 and "" or "s"))
     
     if #removed > 0 then
       local ids = {}
@@ -547,7 +529,7 @@ local function HandleSlashCommand(msg)
     for id in pairs(settings.customList) do tinsert(allIds, id) end
     
     if #allIds == 0 then
-      print("MuteBrann: No custom sound IDs to validate.")
+      print("MuteValeera: No custom sound IDs to validate.")
       return
     end
     
@@ -570,7 +552,7 @@ local function HandleSlashCommand(msg)
       end
     end
     
-    print(("MuteBrann: Validation results for %d custom IDs:"):format(#allIds))
+    print(("MuteValeera: Validation results for %d custom IDs:"):format(#allIds))
     
     if #systemRange > 0 then
       print(("  ⚠ System/UI sound range (%d): %s"):format(#systemRange, tconcat(systemRange, ", ")))
@@ -597,11 +579,11 @@ local function HandleSlashCommand(msg)
     for _ in pairs(settings.customList) do count = count + 1 end
     
     if count == 0 then
-      print("MuteBrann: No custom sound IDs to clear.")
+      print("MuteValeera: No custom sound IDs to clear.")
       return
     end
     
-    print(("MuteBrann: This will remove all %d custom sound IDs. Type '/mutebrann clearconfirm' to confirm."):format(count))
+    print(("MuteValeera: This will remove all %d custom sound IDs. Type '/mutevaleera clearconfirm' to confirm."):format(count))
     return
     
   elseif cmd == "clearconfirm" then
@@ -609,24 +591,24 @@ local function HandleSlashCommand(msg)
     for _ in pairs(settings.customList) do count = count + 1 end
     
     if count == 0 then
-      print("MuteBrann: No custom sound IDs to clear.")
+      print("MuteValeera: No custom sound IDs to clear.")
       return
     end
     
     wipe(settings.customList)
-    print(("MuteBrann: Cleared %d custom sound IDs."):format(count))
+    print(("MuteValeera: Cleared %d custom sound IDs."):format(count))
     
   elseif cmd == "list" then
     local customIds = {}
     for id in pairs(settings.customList) do tinsert(customIds, id) end
     
     if #customIds == 0 then
-      print("MuteBrann: No custom sound IDs configured.")
+      print("MuteValeera: No custom sound IDs configured.")
       return
     end
     
     tsort(customIds)
-    print(("MuteBrann: Custom IDs (%d):"):format(#customIds))
+    print(("MuteValeera: Custom IDs (%d):"):format(#customIds))
     for i = 1, #customIds, 10 do
       local batchEnd = math.min(i + 9, #customIds)
       local batch = {}
@@ -640,13 +622,13 @@ local function HandleSlashCommand(msg)
     for id in pairs(settings.customList) do tinsert(customIds, id) end
     
     if #customIds == 0 then
-      print("MuteBrann: No custom sound IDs to export.")
+      print("MuteValeera: No custom sound IDs to export.")
       return
     end
     
     tsort(customIds)
     local exportStr = tconcat(customIds, ",")
-    local dialog = StaticPopup_Show("MUTEBRANN_EXPORT")
+    local dialog = StaticPopup_Show("MUTEVALEERA_EXPORT")
     if dialog and dialog.editBox then
       dialog.editBox:SetText(exportStr)
       dialog.editBox:HighlightText()
@@ -655,13 +637,13 @@ local function HandleSlashCommand(msg)
     
   elseif cmd == "import" then
     if rest == "" then
-      StaticPopup_Show("MUTEBRANN_IMPORT")
+      StaticPopup_Show("MUTEVALEERA_IMPORT")
       return
     end
     
     local parseResults = ParseIdList(rest)
     if parseResults.empty then
-      print("MuteBrann: No sound IDs found to import.")
+      print("MuteValeera: No sound IDs found to import.")
       return
     end
     
@@ -675,7 +657,7 @@ local function HandleSlashCommand(msg)
       end
     end
     
-    print(("MuteBrann: Imported %d new custom ID%s (%d duplicate%s skipped, %d invalid)."):format(
+    print(("MuteValeera: Imported %d new custom ID%s (%d duplicate%s skipped, %d invalid)."):format(
       added, added == 1 and "" or "s",
       skipped, skipped == 1 and "" or "s",
       #parseResults.invalid
@@ -683,7 +665,7 @@ local function HandleSlashCommand(msg)
     
   elseif cmd == "ui" or cmd == "config" then
     if InCombatLockdown and InCombatLockdown() then
-      print("MuteBrann: Cannot open the settings panel during combat. Try again after combat.")
+      print("MuteValeera: Cannot open the settings panel during combat. Try again after combat.")
       return
     end
 
@@ -691,16 +673,16 @@ local function HandleSlashCommand(msg)
     return
     
   elseif cmd == "help" or cmd == "" then
-    print("MuteBrann Commands:")
+    print("MuteValeera Commands:")
     print("  Basic: on | off | toggle | full | partial | status")
     print("  Custom: add <ids> | del <ids> | list | clear")
     print("  Advanced: validate | export | import <ids> | ui")
-    print("  Aliases: /mb = /mutebrann")
+    print("  Aliases: /mv = /mutevaleera")
     print("  IDs can be separated by commas, spaces, or semicolons")
     return
     
   elseif cmd == "helpfull" then
-    print("MuteBrann Detailed Commands:")
+    print("MuteValeera Detailed Commands:")
     print("  Basic Controls:")
     print("    on | off | toggle - Control muting state")
     print("    full | partial - Include/exclude critical lines")
@@ -716,15 +698,15 @@ local function HandleSlashCommand(msg)
     print("    import <ids> - Import custom IDs from string")
     print("    ui - Open settings panel")
     print("  Examples:")
-    print("    /mutebrann add 12345,67890")
-    print("    /mutebrann add 12345 67890 11111")
-    print("    /mb toggle")
-    print("    /mutebrann import 12345,67890,11111")
+    print("    /mutevaleera add 12345,67890")
+    print("    /mutevaleera add 12345 67890 11111")
+    print("    /mv toggle")
+    print("    /mutevaleera import 12345,67890,11111")
     return
     
   else
-    print(("MuteBrann: Unknown command '%s'"):format(cmd))
-    print("  Use '/mutebrann help' for commands or '/mutebrann helpfull' for detailed help")
+    print(("MuteValeera: Unknown command '%s'"):format(cmd))
+    print("  Use '/mutevaleera help' for commands or '/mutevaleera helpfull' for detailed help")
     return
   end
 
@@ -732,13 +714,13 @@ local function HandleSlashCommand(msg)
 end
 
 -- Register slash command
-SLASH_MUTEBRANN1 = "/mutebrann"
-SLASH_MUTEBRANN2 = "/mb"
-SlashCmdList["MUTEBRANN"] = HandleSlashCommand
+SLASH_MUTEVALEERA1 = "/mutevaleera"
+SLASH_MUTEVALEERA2 = "/mv"
+SlashCmdList["MUTEVALEERA"] = HandleSlashCommand
 
 -- Export/Import popup dialogs
-StaticPopupDialogs["MUTEBRANN_EXPORT"] = {
-  text = "MuteBrann: Copy this export string (Ctrl+C):",
+StaticPopupDialogs["MUTEVALEERA_EXPORT"] = {
+  text = "MuteValeera: Copy this export string (Ctrl+C):",
   button1 = "Close",
   hasEditBox = true,
   editBoxWidth = 350,
@@ -755,8 +737,8 @@ StaticPopupDialogs["MUTEBRANN_EXPORT"] = {
   preferredIndex = 3,
 }
 
-StaticPopupDialogs["MUTEBRANN_IMPORT"] = {
-  text = "MuteBrann: Paste sound IDs to import (comma-separated):",
+StaticPopupDialogs["MUTEVALEERA_IMPORT"] = {
+  text = "MuteValeera: Paste sound IDs to import (comma-separated):",
   button1 = "Import",
   button2 = "Cancel",
   hasEditBox = true,
@@ -835,14 +817,14 @@ local function SetupTooltip()
     end
     
     -- Locale-independent NPC ID check via GUID
-    local isBrann = false
+    local isValeera = false
     local _, _, _, _, _, npcIdStr = strsplit("-", guid)
     local npcId = tonumber(npcIdStr)
-    if npcId and BRANN_NPC_IDS[npcId] then
-      isBrann = true
+    if npcId and VALEERA_NPC_IDS[npcId] then
+      isValeera = true
     end
     
-    if isBrann then
+    if isValeera then
       tooltip:AddLine(" ")
       
       local status, color
@@ -854,7 +836,7 @@ local function SetupTooltip()
         status, color = "Not muted", "ff0000" 
       end
       
-      tooltip:AddLine(("|cff%sMuteBrann: %s|r"):format(color, status))
+      tooltip:AddLine(("|cff%sMuteValeera: %s|r"):format(color, status))
       
       if isMuted then
         local muteCount = #GetFinalMuteList()
@@ -877,12 +859,12 @@ local function RegisterSettings()
     -- Title
     local title = panel:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
     title:SetPoint("TOPLEFT", 16, -16)
-    title:SetText(("Mute Repetitive Brann  |cff888888v%s|r"):format(ADDON_VERSION))
+    title:SetText(("Mute Valeera  |cff888888v%s|r"):format(ADDON_VERSION))
     
     -- Description
     local desc = panel:CreateFontString(nil, "ARTWORK", "GameFontHighlight")
     desc:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -8)
-    desc:SetText("Silences Brann Bronzebeard's repetitive voice lines during delves.")
+    desc:SetText("Silences Valeera Sanguinar's repetitive delve companion voice lines.")
     desc:SetJustifyH("LEFT")
     desc:SetWidth(500)
     
@@ -928,8 +910,8 @@ local function RegisterSettings()
     -- Mute Voice Lines checkbox
     local muteCheck = CreateCheckbox(
       panel, desc,
-      "Mute Brann voice lines",
-      "Enable or disable muting of Brann's repetitive voice lines in delves.",
+      "Mute Valeera voice lines",
+      "Enable or disable muting of Valeera's repetitive voice lines in delves.",
       function() return settings.isMuted end,
       function(val)
         settings.isMuted = val
@@ -958,7 +940,7 @@ local function RegisterSettings()
     
     local customDesc = panel:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
     customDesc:SetPoint("TOPLEFT", customHeader, "BOTTOMLEFT", 0, -4)
-    customDesc:SetText("|cff888888Add additional sound IDs to mute. Use /mutebrann add <ids> or enter below.|r")
+    customDesc:SetText("|cff888888Add additional sound IDs to mute. Use /mutevaleera add <ids> or enter below.|r")
     customDesc:SetJustifyH("LEFT")
     customDesc:SetWidth(470)
     
@@ -1009,11 +991,11 @@ local function RegisterSettings()
     clearBtn:SetSize(100, 22)
     clearBtn:SetText("Clear All")
     clearBtn:SetScript("OnClick", function()
-      StaticPopup_Show("MUTEBRANN_SETTINGS_CLEAR")
+      StaticPopup_Show("MUTEVALEERA_SETTINGS_CLEAR")
     end)
     
     -- Popup for clear confirmation
-    StaticPopupDialogs["MUTEBRANN_SETTINGS_CLEAR"] = {
+    StaticPopupDialogs["MUTEVALEERA_SETTINGS_CLEAR"] = {
       text = "Clear all custom sound IDs?",
       button1 = "Clear",
       button2 = "Cancel",
@@ -1021,7 +1003,7 @@ local function RegisterSettings()
         wipe(settings.customList)
         ApplyMuteState()
         panel.refreshCustomList()
-        print("MuteBrann: All custom sound IDs cleared.")
+        print("MuteValeera: All custom sound IDs cleared.")
       end,
       timeout = 0,
       whileDead = true,
@@ -1084,13 +1066,13 @@ local function RegisterSettings()
     -- Initial refresh
     panel.refreshCustomList()
     
-    local category = Settings.RegisterCanvasLayoutCategory(panel, "Mute Brann")
+    local category = Settings.RegisterCanvasLayoutCategory(panel, "Mute Valeera")
     Settings.RegisterAddOnCategory(category)
     settingsCategory = category
   end)
   
   if not ok then
-    print("MuteBrann: Settings panel failed to register: " .. tostring(err))
+    print("MuteValeera: Settings panel failed to register: " .. tostring(err))
   end
 end
 

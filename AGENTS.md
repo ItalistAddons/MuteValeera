@@ -1,26 +1,29 @@
 # Repository Agent Guide
 
-This repository contains the World of Warcraft addon `MuteRepetitiveBrann`.
+This repository contains the World of Warcraft addon `MuteValeera`.
 
 ## Repo Rules
 
 - Keep changes focused on the addon source, release automation, and documentation needed to ship the addon.
-- Treat `MuteRepetitiveBrann.lua` and `MuteRepetitiveBrann.toc` as the source of truth for runtime behavior and addon metadata.
+- Treat `MuteValeera.lua` and `MuteValeera.toc` as the source of truth for runtime behavior and addon metadata.
 - Keep the addon locale-independent. Prefer sound IDs, events, and WoW APIs over localized text matching.
 - Preserve existing slash commands and saved-variable behavior unless a documented breaking change is intentional.
 - For user-visible behavior changes, update `CHANGELOG.md` in the same change.
-- For versioned releases, keep the version in `MuteRepetitiveBrann.toc`, the tag, and the changelog aligned.
+- For versioned releases, keep the version in `MuteValeera.toc`, the tag, and the changelog aligned.
 - Do not commit packaged zip files, generated release output, WoW SavedVariables backups, or local editor/account state.
-- If you add files that should not ship to CurseForge, update `.pkgmeta` ignore rules as part of the same change.
+- If you add files that should not ship in the packaged addon, update `.pkgmeta` ignore rules as part of the same change.
+- Keep the built-in mute list limited to Valeera Sanguinar delve-companion voice assets first introduced after build `12.0.0.63534`.
+- Use the Wago Tools `Valeera` file search on pages `9` through `15` as the first-pass candidate pool unless the repository owner explicitly expands it.
+- If a Valeera asset is ambiguous or predates `12.0.0.63534`, exclude it instead of guessing.
 
 ## Release Rules
 
 - Releases are triggered by pushing a git tag that matches `v*`.
-- GitHub Actions workflow `.github/workflows/release.yml` packages and publishes through `BigWigsMods/packager@v2`.
-- CurseForge publishing must use the GitHub Actions repository secret named `CF_API_KEY`.
-- Do not rename `CF_API_KEY` in workflow files or documentation unless the repository owner explicitly requests a coordinated change everywhere.
+- GitHub Actions workflow `.github/workflows/release.yml` packages through `BigWigsMods/packager@v2` and creates GitHub releases.
+- CurseForge publishing is intentionally disabled until a real project exists.
+- If CurseForge support is added later, the GitHub Actions repository secret name must be `CF_API_KEY`.
 - Before tagging a release, confirm:
-  - `MuteRepetitiveBrann.toc` has the intended version.
+  - `MuteValeera.toc` has the intended version.
   - `CHANGELOG.md` includes the release notes.
   - `.pkgmeta` still excludes non-distribution files.
   - Local packaging or a smoke test has been run when the change affects packaging, loading, or command behavior.
@@ -31,10 +34,10 @@ This repository contains the World of Warcraft addon `MuteRepetitiveBrann`.
 - The addon loads without Lua errors.
 - Slash commands and settings still work, or the change documents any intentional behavior difference.
 - `CHANGELOG.md` is updated for user-facing changes.
-- `MuteRepetitiveBrann.toc` version is updated when preparing a release.
-- New files are reviewed for whether they belong in the CurseForge package and whether `.pkgmeta` or `.gitignore` must change.
+- `MuteValeera.toc` version is updated when preparing a release.
+- New files are reviewed for whether they belong in the packaged addon and whether `.pkgmeta` or `.gitignore` must change.
 - No secrets, tokens, personal paths, or local editor/account files are included in the diff.
-- If release automation was touched, verify `.github/workflows/release.yml`, `.pkgmeta`, and `PUBLISHING.md` still agree on the release process and the `CF_API_KEY` secret name.
+- If release automation was touched, verify `.github/workflows/release.yml`, `.pkgmeta`, and `PUBLISHING.md` still agree on the release process.
 
 ## Multi-Account VS Code Notes
 
@@ -47,8 +50,8 @@ This repository contains the World of Warcraft addon `MuteRepetitiveBrann`.
 ## Strict Secret-Handling Rules
 
 - Never commit API keys, tokens, cookies, session exports, private URLs with embedded credentials, or screenshots/logs that reveal them.
-- Never place the CurseForge API token directly in source files, `PUBLISHING.md`, PR descriptions, issues, commit messages, or local files intended for commit.
-- The CurseForge token belongs only in the GitHub Actions secret named `CF_API_KEY`.
+- Never place credentials directly in source files, `PUBLISHING.md`, PR descriptions, issues, commit messages, or local files intended for commit.
+- If CurseForge publishing is enabled later, the token belongs only in the GitHub Actions secret named `CF_API_KEY`.
 - Treat `.env`, `.env.*`, key files, exported auth JSON, and local release notes containing secrets as non-committable.
 - If a secret is exposed or even suspected to be exposed:
   - stop using it;
