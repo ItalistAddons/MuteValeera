@@ -1,10 +1,39 @@
 local ADDON_NAME = ...
-local ADDON_VERSION = C_AddOns.GetAddOnMetadata(ADDON_NAME, "Version")
+
+local function GetAddonMetadataSafe(addonName, field)
+  if C_AddOns and C_AddOns.GetAddOnMetadata then
+    return C_AddOns.GetAddOnMetadata(addonName, field)
+  end
+  if GetAddOnMetadata then
+    return GetAddOnMetadata(addonName, field)
+  end
+end
+
+local ADDON_VERSION = GetAddonMetadataSafe(ADDON_NAME, "Version") or "unknown"
 
 -- Local references for performance
-local MuteSound, UnmuteSound = MuteSoundFile, UnmuteSoundFile
+local MuteSoundAPI = type(MuteSoundFile) == "function" and MuteSoundFile or nil
+local UnmuteSoundAPI = type(UnmuteSoundFile) == "function" and UnmuteSoundFile or nil
 local tinsert, tsort, tconcat, wipe = table.insert, table.sort, table.concat, table.wipe
 local pairs, ipairs, tonumber = pairs, ipairs, tonumber
+local unpack = unpack or table.unpack
+
+local warnedMissingSoundAPI = false
+
+local function SetSoundMuted(soundId, shouldMute)
+  local fn = shouldMute and MuteSoundAPI or UnmuteSoundAPI
+  if fn then
+    fn(soundId)
+    return true
+  end
+
+  if not warnedMissingSoundAPI then
+    warnedMissingSoundAPI = true
+    print("MuteBrann: Sound mute API is unavailable on this client. Muting is temporarily disabled.")
+  end
+
+  return false
+end
 
 -- SavedVariables
 MuteBrannSettings = MuteBrannSettings or {}
@@ -171,19 +200,27 @@ local function ValidateIdRange(id)
   
   return warnings
 end
-local function InitializeSettings()
-  -- Only migrate settings if version changed
-  if settings.version ~= ADDON_VERSION then
-    for k, v in pairs(DEFAULTS) do
-      if settings[k] == nil then
-        if type(v) == "table" then
-          settings[k] = {}
-          for ik, iv in pairs(v) do settings[k][ik] = iv end
-        else
-          settings[k] = v
-        end
+
+local function CopyMissingDefaults(dst, src)
+  for k, v in pairs(src) do
+    if dst[k] == nil then
+      if type(v) == "table" then
+        dst[k] = {}
+        CopyMissingDefaults(dst[k], v)
+      else
+        dst[k] = v
       end
+    elseif type(v) == "table" and type(dst[k]) == "table" then
+      CopyMissingDefaults(dst[k], v)
     end
+  end
+end
+
+local function InitializeSettings()
+  local oldVersion = settings.version
+  CopyMissingDefaults(settings, DEFAULTS)
+
+  if oldVersion ~= ADDON_VERSION then
     settings.version = ADDON_VERSION
     print(("MuteBrann: Settings updated to version %s"):format(ADDON_VERSION))
   end
@@ -236,12 +273,23 @@ local function ApplyMuteState()
   
   local muteList = GetFinalMuteList()
   for _, id in ipairs(muteList) do
-    if isMuted then 
-      MuteSound(id) 
-    else 
-      UnmuteSound(id) 
-    end
+    SetSoundMuted(id, isMuted)
   end
+end
+
+local function TryOpenSettingsCategory()
+  if not (settingsCategory and Settings and Settings.OpenToCategory) then
+    print("MuteBrann: Settings panel not available on this client.")
+    return
+  end
+
+  local categoryID = settingsCategory.GetID and settingsCategory:GetID() or settingsCategory
+  if type(categoryID) ~= "number" then
+    print("MuteBrann: Settings panel is available, but the category could not be resolved.")
+    return
+  end
+
+  Settings.OpenToCategory(categoryID)
 end
 
 -- Command handling with better error checking
@@ -634,21 +682,12 @@ local function HandleSlashCommand(msg)
     ))
     
   elseif cmd == "ui" or cmd == "config" then
-    if settingsCategory and Settings and Settings.OpenToCategory then
-      -- Get numeric category ID explicitly
-      local categoryID = settingsCategory.GetID and settingsCategory:GetID() or settingsCategory
-      if type(categoryID) == "number" then
-        Settings.OpenToCategory(categoryID)
-      else
-        -- Fallback: open settings without specific category
-        if SettingsPanel then
-          SettingsPanel:Open()
-        end
-        print("MuteBrann: Settings panel opened (navigate to 'AddOns' > 'Mute Brann').")
-      end
-    else
-      print("MuteBrann: Settings panel not available.")
+    if InCombatLockdown and InCombatLockdown() then
+      print("MuteBrann: Cannot open the settings panel during combat. Try again after combat.")
+      return
     end
+
+    TryOpenSettingsCategory()
     return
     
   elseif cmd == "help" or cmd == "" then
@@ -746,8 +785,42 @@ StaticPopupDialogs["MUTEBRANN_IMPORT"] = {
 }
 
 -- Tooltip enhancement (with error protection)
+local function GetTooltipGUID(tooltip, data)
+  if data then
+    if type(data.guid) == "string" and data.guid ~= "" then
+      return data.guid
+    end
+    if type(data.healthGUID) == "string" and data.healthGUID ~= "" then
+      return data.healthGUID
+    end
+  end
+
+  if tooltip and tooltip.GetUnit then
+    local _, unit = tooltip:GetUnit()
+    if unit then
+      if securecallfunction then
+        local guid = securecallfunction(UnitGUID, unit)
+        if type(guid) == "string" and guid ~= "" then
+          return guid
+        end
+      else
+        local guid = UnitGUID(unit)
+        if type(guid) == "string" and guid ~= "" then
+          return guid
+        end
+      end
+    end
+  end
+end
+
 local function SetupTooltip()
-  if not (TooltipDataProcessor and TooltipDataProcessor.AddTooltipPostCall) then
+  if not (
+    TooltipDataProcessor and
+    TooltipDataProcessor.AddTooltipPostCall and
+    Enum and
+    Enum.TooltipDataType and
+    Enum.TooltipDataType.Unit
+  ) then
     return
   end
   
@@ -756,23 +829,17 @@ local function SetupTooltip()
       return 
     end
     
-    local unit = data.unit or (tooltip.GetUnit and tooltip:GetUnit())
-    if not unit then
+    local guid = GetTooltipGUID(tooltip, data)
+    if not guid then
       return
-    end
-    if not UnitExists(unit) then 
-      return 
     end
     
     -- Locale-independent NPC ID check via GUID
     local isBrann = false
-    local guid = UnitGUID(unit)
-    if guid then
-      local _, _, _, _, _, npcIdStr = strsplit("-", guid)
-      local npcId = tonumber(npcIdStr)
-      if npcId and BRANN_NPC_IDS[npcId] then
-        isBrann = true
-      end
+    local _, _, _, _, _, npcIdStr = strsplit("-", guid)
+    local npcId = tonumber(npcIdStr)
+    if npcId and BRANN_NPC_IDS[npcId] then
+      isBrann = true
     end
     
     if isBrann then

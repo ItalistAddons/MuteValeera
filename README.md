@@ -17,6 +17,12 @@ Silences Brann Bronzebeard's repetitive voice lines during delves and adventures
 2. Extract to `World of Warcraft\_retail_\Interface\AddOns\`
 3. Restart WoW or `/reload`
 
+## Compatibility
+
+- Retail Midnight compatible (`## Interface: 120001`)
+- Existing SavedVariables are preserved
+- If the client no longer exposes the sound mute API, the addon warns once and disables muting instead of throwing Lua errors
+
 ## Commands
 
 ### Basic

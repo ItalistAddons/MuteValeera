@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.4.2] - 2026-03-01
+
+### Fixed
+- Updated the TOC interface for Midnight retail (`120001`).
+- Added defensive feature detection for addon metadata and sound mute APIs.
+- Fixed tooltip GUID resolution to avoid calling `UnitExists` on secure tooltip unit values during delves.
+- Made `/mutebrann ui` fail safely during combat instead of risking blocked Settings access.
+
+### Compatibility
+- Preserves current retail behavior where the underlying APIs are still available.
+- Gracefully disables muting with a one-time warning if the client does not expose the sound mute API.
+
 ## [1.4.1] - 2026-02-10
 
 ### Fixed
@@ -29,7 +41,6 @@ All notable changes to this project will be documented in this file.
 - Settings panel no longer shows unrelated WoW options
 - Removed dead code after `clearconfirm` wipe
 - `ApplyMuteState` no longer called for read-only commands
-- TOC Interface version updated to 120001 (Midnight ready)
 
 ### Changed
 - Switched from `RegisterVerticalLayoutCategory` to `RegisterCanvasLayoutCategory`
