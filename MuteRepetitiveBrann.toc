@@ -1,7 +1,7 @@
 ## Interface: 120001
 ## Title: Mute Repetitive Brann
 ## Notes: Silences Brann Bronzebeard's voice lines during delves and adventures.
-## Version: 1.4.2
+## Version: 1.4.3
 ## Author: Italist
 ## X-Curse-Project-ID: 1102496
 ## X-Category: Audio & Video

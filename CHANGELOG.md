@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.4.3] - 2026-03-01
+
+### Fixed
+- Corrected the CurseForge project ID used for automated publishing.
+
 ## [1.4.2] - 2026-03-01
 
 ### Fixed
