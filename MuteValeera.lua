@@ -75,8 +75,6 @@ local baseMuteList = {
 -- Keep the partial/full UX intact even though no verified critical subset exists yet.
 local criticalMuteList = {}
 
--- Tooltip status is disabled until Valeera companion NPC IDs are confirmed safely.
-local VALEERA_NPC_IDS = {}
 
 -- Input validation and sanitization helpers
 local function ValidateSoundId(idStr)
@@ -782,85 +780,6 @@ StaticPopupDialogs["MUTEVALEERA_IMPORT"] = {
   preferredIndex = 3,
 }
 
--- Tooltip enhancement (with error protection)
-local function GetTooltipGUID(tooltip, data)
-  if data then
-    if type(data.guid) == "string" and data.guid ~= "" then
-      return data.guid
-    end
-    if type(data.healthGUID) == "string" and data.healthGUID ~= "" then
-      return data.healthGUID
-    end
-  end
-
-  if tooltip and tooltip.GetUnit then
-    local _, unit = tooltip:GetUnit()
-    if unit then
-      if securecallfunction then
-        local guid = securecallfunction(UnitGUID, unit)
-        if type(guid) == "string" and guid ~= "" then
-          return guid
-        end
-      else
-        local guid = UnitGUID(unit)
-        if type(guid) == "string" and guid ~= "" then
-          return guid
-        end
-      end
-    end
-  end
-end
-
-local function SetupTooltip()
-  if not (
-    TooltipDataProcessor and
-    TooltipDataProcessor.AddTooltipPostCall and
-    Enum and
-    Enum.TooltipDataType and
-    Enum.TooltipDataType.Unit
-  ) then
-    return
-  end
-  
-  TooltipDataProcessor.AddTooltipPostCall(Enum.TooltipDataType.Unit, function(tooltip, data)
-    if not (tooltip and data and isInitialized) then 
-      return 
-    end
-    
-    local guid = GetTooltipGUID(tooltip, data)
-    if not guid then
-      return
-    end
-    
-    -- Locale-independent NPC ID check via GUID
-    local isValeera = false
-    local _, _, _, _, _, npcIdStr = strsplit("-", guid)
-    local npcId = tonumber(npcIdStr)
-    if npcId and VALEERA_NPC_IDS[npcId] then
-      isValeera = true
-    end
-    
-    if isValeera then
-      tooltip:AddLine(" ")
-      
-      local status, color
-      if isMuted and muteCritical then 
-        status, color = "Fully muted", "00ff00"
-      elseif isMuted then 
-        status, color = "Partially muted", "ffff00"
-      else 
-        status, color = "Not muted", "ff0000" 
-      end
-      
-      tooltip:AddLine(("|cff%sMuteValeera: %s|r"):format(color, status))
-      
-      if isMuted then
-        local muteCount = #GetFinalMuteList()
-        tooltip:AddLine(("|cff888888%d sounds muted|r"):format(muteCount))
-      end
-    end
-  end)
-end
 
 -- Settings registration (canvas layout — avoids Blizzard setting bleed)
 local function RegisterSettings()
@@ -1105,7 +1024,6 @@ eventFrame:SetScript("OnEvent", function(self, event, addonName)
   elseif event == "PLAYER_LOGIN" then
     C_Timer.After(1, function()
       RegisterSettings()
-      SetupTooltip()
     end)
     
     self:UnregisterEvent("ADDON_LOADED")

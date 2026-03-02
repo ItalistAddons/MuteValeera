@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Unreleased]
+
+### Fixed
+- Removed the tooltip status logic entirely, avoiding tooltip taint from GUID inspection on modern clients
+
 ## [1.0.1] - 2026-03-02
 
 ### Changed
