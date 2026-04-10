@@ -14,11 +14,33 @@ local ADDON_VERSION = GetAddonMetadataSafe(ADDON_NAME, "Version") or "unknown"
 -- Local references for performance
 local MuteSoundAPI = type(MuteSoundFile) == "function" and MuteSoundFile or nil
 local UnmuteSoundAPI = type(UnmuteSoundFile) == "function" and UnmuteSoundFile or nil
+local GetCVarAPI = type(GetCVar) == "function" and GetCVar or nil
+local GetCVarBoolAPI = type(GetCVarBool) == "function" and GetCVarBool or nil
+local SetCVarAPI = type(SetCVar) == "function" and SetCVar or nil
+local UnitGUIDAPI = type(UnitGUID) == "function" and UnitGUID or nil
+local UnitExistsAPI = type(UnitExists) == "function" and UnitExists or nil
 local tinsert, tsort, tconcat, wipe = table.insert, table.sort, table.concat, table.wipe
 local pairs, ipairs, tonumber = pairs, ipairs, tonumber
 local unpack = unpack or table.unpack
 
 local warnedMissingSoundAPI = false
+local CHAT_BUBBLE_CVAR = "chatBubbles"
+local VALEERA_COMPANION_UNIT_TOKENS = {
+  "companion",
+  "delvecompanion",
+  "follower",
+}
+local BUBBLE_SOURCE_GUID_METHODS = {
+  "GetSourceGUID",
+  "GetGUID",
+}
+local BUBBLE_SOURCE_TOKEN_METHODS = {
+  "GetSourceUnit",
+  "GetSourceUnitToken",
+  "GetUnitToken",
+}
+
+local RefreshBubbleState
 
 local function SetSoundMuted(soundId, shouldMute)
   local fn = shouldMute and MuteSoundAPI or UnmuteSoundAPI
@@ -40,13 +62,24 @@ MuteValeeraSettings = MuteValeeraSettings or {}
 local settings = MuteValeeraSettings
 
 -- State variables
-local isMuted, muteCritical
+local isMuted, muteCritical, muteBubbles, muteDundun, muteNanea
 local isInitialized = false
 local settingsCategory
+local isInDelve = false
+local activeBubbleStrategy = "off"
+local bubbleTicker
+local forcedBubbleCVar = false
+local bubbleCVarBackup
+local suppressOwnCVarUpdate = false
+local selectiveBubbleSupport = nil
 
 local DEFAULTS = {
   isMuted = true,
   muteCritical = false,
+  muteBubbles = true,
+  muteDundun = true,
+  muteNanea = true,
+  bubbleFallbackMode = "auto",
   version = ADDON_VERSION,
   customList = {},
 }
@@ -74,6 +107,330 @@ local baseMuteList = {
 
 -- Keep the partial/full UX intact even though no verified critical subset exists yet.
 local criticalMuteList = {}
+
+-- Dundun (rat companion + Abundance-event VO). All 39 entries audited from Wago Tools
+-- search "Dundun", builds 12.0.0.63534 and 12.0.0.64741. Gaps at _15 and _27 confirmed
+-- absent in the community listfile.
+local dundunMuteList = {
+  7249707, 7251759, 7251762, 7251765, 7251768, 7251771, 7251774, 7251777,
+  7251784, 7251787, 7251790, 7251793, 7251796, 7251799,
+  7251805, 7251808, 7251811, 7251814, 7251817, 7251820, 7251823, 7251826,
+  7251829, 7251836, 7251839, 7251842,
+  7251845, 7261433, 7273124, 7273905, 7273906, 7273907, 7273908, 7273909,
+  7273910, 7273911,
+  7609114, 7609115, 7609116,
+}
+
+-- Nanea (Loa Speaker Nanea Revantusk — Nalorakk's Den). All 33 entries audited from
+-- Wago Tools search "Nanea", builds 12.0.0.63534, 12.0.0.63854, and 12.0.0.64741.
+local naneaMuteList = {
+  7272801, 7272803, 7272804, 7272805, 7272806, 7272807, 7272808, 7272809, 7272810,
+  7329285, 7329286, 7329292, 7329293, 7329294, 7329295, 7329296, 7329297, 7329298,
+  7329299, 7329301, 7329302, 7329304, 7329305, 7329306, 7329307, 7329308,
+  7490224, 7490227, 7490229, 7490232, 7490242, 7490245,
+  7633293,
+}
+
+local function GetTrackedValeeraCompanion()
+  for _, unitToken in ipairs(VALEERA_COMPANION_UNIT_TOKENS) do
+    local guid = UnitGUIDAPI and UnitGUIDAPI(unitToken)
+    if guid then
+      return guid, unitToken
+    end
+
+    if UnitExistsAPI and UnitExistsAPI(unitToken) then
+      return nil, unitToken
+    end
+  end
+end
+
+local function GetBubbleSourceGUID(bubble)
+  if not bubble then
+    return nil
+  end
+
+  for _, methodName in ipairs(BUBBLE_SOURCE_GUID_METHODS) do
+    local method = bubble[methodName]
+    if type(method) == "function" then
+      local ok, value = pcall(method, bubble)
+      if ok and type(value) == "string" and value ~= "" then
+        return value
+      end
+    end
+  end
+end
+
+local function GetBubbleSourceUnitToken(bubble)
+  if not bubble then
+    return nil
+  end
+
+  for _, methodName in ipairs(BUBBLE_SOURCE_TOKEN_METHODS) do
+    local method = bubble[methodName]
+    if type(method) == "function" then
+      local ok, value = pcall(method, bubble)
+      if ok and type(value) == "string" and value ~= "" then
+        return string.lower(value)
+      end
+    end
+  end
+end
+
+local function HideBubbleFrame(bubble)
+  if bubble and type(bubble.Hide) == "function" then
+    pcall(bubble.Hide, bubble)
+  end
+end
+
+local function StopSelectiveBubbleSuppression()
+  if bubbleTicker then
+    bubbleTicker:Cancel()
+    bubbleTicker = nil
+  end
+end
+
+local function RestoreBubbleCVars()
+  if forcedBubbleCVar and bubbleCVarBackup and SetCVarAPI then
+    suppressOwnCVarUpdate = true
+    if bubbleCVarBackup[CHAT_BUBBLE_CVAR] ~= nil then
+      pcall(SetCVarAPI, CHAT_BUBBLE_CVAR, bubbleCVarBackup[CHAT_BUBBLE_CVAR])
+    end
+    suppressOwnCVarUpdate = false
+  end
+
+  forcedBubbleCVar = false
+  bubbleCVarBackup = nil
+end
+
+local function ApplyDelveWideBubbleFallback()
+  if not (GetCVarAPI and SetCVarAPI) then
+    return false
+  end
+
+  if not bubbleCVarBackup then
+    bubbleCVarBackup = {
+      [CHAT_BUBBLE_CVAR] = GetCVarAPI(CHAT_BUBBLE_CVAR),
+    }
+  end
+
+  suppressOwnCVarUpdate = true
+  local ok = pcall(SetCVarAPI, CHAT_BUBBLE_CVAR, "0")
+  suppressOwnCVarUpdate = false
+
+  forcedBubbleCVar = ok
+  return ok
+end
+
+local function EvaluateSelectiveBubbleSupport()
+  if selectiveBubbleSupport == false then
+    return false
+  end
+
+  if not (C_ChatBubbles and type(C_ChatBubbles.GetAllChatBubbles) == "function") then
+    selectiveBubbleSupport = false
+    return false
+  end
+
+  if not (C_Timer and type(C_Timer.NewTicker) == "function") then
+    selectiveBubbleSupport = false
+    return false
+  end
+
+  local companionGuid, companionUnitToken = GetTrackedValeeraCompanion()
+  if not (companionGuid or companionUnitToken) then
+    return nil
+  end
+
+  local ok, bubbles = pcall(C_ChatBubbles.GetAllChatBubbles)
+  if not ok or type(bubbles) ~= "table" then
+    selectiveBubbleSupport = false
+    return false
+  end
+
+  local sawBubble = false
+  for _, bubble in ipairs(bubbles) do
+    sawBubble = true
+    if GetBubbleSourceGUID(bubble) or GetBubbleSourceUnitToken(bubble) then
+      selectiveBubbleSupport = true
+      return true
+    end
+  end
+
+  if sawBubble then
+    selectiveBubbleSupport = false
+    return false
+  end
+
+  return nil
+end
+
+local function HideSelectiveValeeraBubbles()
+  local companionGuid, companionUnitToken = GetTrackedValeeraCompanion()
+  if not (companionGuid or companionUnitToken) then
+    return true
+  end
+
+  local ok, bubbles = pcall(C_ChatBubbles.GetAllChatBubbles)
+  if not ok or type(bubbles) ~= "table" then
+    selectiveBubbleSupport = false
+    return false
+  end
+
+  local sawBubble = false
+  local sawOwnerMetadata = false
+
+  for _, bubble in ipairs(bubbles) do
+    sawBubble = true
+
+    local sourceUnitToken = GetBubbleSourceUnitToken(bubble)
+    local sourceGuid = GetBubbleSourceGUID(bubble)
+    if not sourceGuid and sourceUnitToken and UnitGUIDAPI then
+      sourceGuid = UnitGUIDAPI(sourceUnitToken)
+    end
+
+    if sourceUnitToken or sourceGuid then
+      sawOwnerMetadata = true
+    end
+
+    local tokenMatch = sourceUnitToken and sourceUnitToken == companionUnitToken
+    local guidMatch = companionGuid and sourceGuid and sourceGuid == companionGuid
+    if tokenMatch or guidMatch then
+      HideBubbleFrame(bubble)
+    end
+  end
+
+  if sawBubble and not sawOwnerMetadata then
+    selectiveBubbleSupport = false
+    return false
+  end
+
+  return true
+end
+
+local function StartSelectiveBubbleSuppression()
+  if bubbleTicker then
+    return true
+  end
+
+  if EvaluateSelectiveBubbleSupport() ~= true then
+    return false
+  end
+
+  bubbleTicker = C_Timer.NewTicker(0.2, function()
+    if not HideSelectiveValeeraBubbles() then
+      StopSelectiveBubbleSuppression()
+      if RefreshBubbleState then
+        RefreshBubbleState("selective-unsupported")
+      end
+    end
+  end)
+
+  return HideSelectiveValeeraBubbles()
+end
+
+local function IsDelveScenarioType(scenarioType)
+  local enum = Enum and Enum.ScenarioType
+  local delveType = enum and enum.Delve
+  return type(delveType) == "number" and scenarioType == delveType
+end
+
+local function IsPlayerInDelve()
+  for _, apiTable in ipairs({C_DelvesUI, C_Delves}) do
+    if type(apiTable) == "table" then
+      for _, methodName in ipairs({"IsInDelve", "IsInActiveDelve", "IsPlayerInDelve"}) do
+        local method = apiTable[methodName]
+        if type(method) == "function" then
+          local ok, value = pcall(method)
+          if ok and type(value) == "boolean" then
+            return value
+          end
+        end
+      end
+    end
+  end
+
+  if C_ScenarioInfo and type(C_ScenarioInfo.GetScenarioInfo) == "function" then
+    local ok, info = pcall(C_ScenarioInfo.GetScenarioInfo)
+    if ok and type(info) == "table" then
+      if info.isDelve == true then
+        return true
+      end
+
+      if IsDelveScenarioType(info.scenarioType or info.type) then
+        return true
+      end
+    end
+  end
+
+  if type(GetScenarioInfo) == "function" then
+    local ok, _, _, _, _, _, _, _, _, scenarioType = pcall(GetScenarioInfo)
+    if ok and IsDelveScenarioType(scenarioType) then
+      return true
+    end
+  end
+
+  return false
+end
+
+local function UpdateDelveState()
+  isInDelve = IsPlayerInDelve()
+  return isInDelve
+end
+
+local function ApplyBubbleStrategy(strategy)
+  if strategy ~= activeBubbleStrategy then
+    StopSelectiveBubbleSuppression()
+    RestoreBubbleCVars()
+    activeBubbleStrategy = "off"
+  end
+
+  if strategy == "valeera-only" then
+    if StartSelectiveBubbleSuppression() then
+      activeBubbleStrategy = "valeera-only"
+      return
+    end
+
+    strategy = isInDelve and "delve-wide" or "off"
+  end
+
+  if strategy == "delve-wide" then
+    if ApplyDelveWideBubbleFallback() then
+      activeBubbleStrategy = "delve-wide"
+      return
+    end
+  end
+
+  activeBubbleStrategy = "off"
+end
+
+RefreshBubbleState = function(reason)
+  if not isInitialized then
+    return
+  end
+
+  UpdateDelveState()
+
+  local shouldSuppressBubbles = settings.isMuted and settings.muteBubbles
+  local strategy = "off"
+  if shouldSuppressBubbles then
+    local support = EvaluateSelectiveBubbleSupport()
+    if support == true then
+      strategy = "valeera-only"
+    elseif isInDelve then
+      strategy = "delve-wide"
+    end
+  end
+
+  ApplyBubbleStrategy(strategy)
+end
+
+local function GetBubbleStatusSummary()
+  return {
+    enabled = settings.muteBubbles and "ON" or "OFF",
+    strategy = activeBubbleStrategy,
+    delve = isInDelve and "YES" or "NO",
+  }
+end
 
 
 -- Input validation and sanitization helpers
@@ -216,14 +573,20 @@ local function InitializeSettings()
   local oldVersion = settings.version
   CopyMissingDefaults(settings, DEFAULTS)
 
+  if settings.bubbleFallbackMode ~= "auto" then
+    settings.bubbleFallbackMode = "auto"
+  end
+
   if oldVersion ~= ADDON_VERSION then
     settings.version = ADDON_VERSION
-    print(("MuteValeera: Settings updated to version %s"):format(ADDON_VERSION))
   end
   
   -- Cache settings locally for performance
   isMuted = settings.isMuted
   muteCritical = settings.muteCritical
+  muteBubbles = settings.muteBubbles
+  muteDundun = settings.muteDundun
+  muteNanea = settings.muteNanea
   settings.customList = settings.customList or {}
   
   isInitialized = true
@@ -243,7 +606,21 @@ local function GetFinalMuteList()
       seen[id] = true 
     end 
   end
-  
+
+  -- Add Dundun sounds if enabled
+  if muteDundun then
+    for _, id in ipairs(dundunMuteList) do
+      seen[id] = true
+    end
+  end
+
+  -- Add Nanea sounds if enabled
+  if muteNanea then
+    for _, id in ipairs(naneaMuteList) do
+      seen[id] = true
+    end
+  end
+
   -- Add custom sounds
   for id in pairs(settings.customList) do 
     local numId = tonumber(id)
@@ -326,13 +703,104 @@ local function HandleSlashCommand(msg)
     
   elseif cmd == "status" then
     local muteCount = #GetFinalMuteList()
-    print(("MuteValeera Status - Mute: %s, Critical mute: %s, Total sounds muted: %d"):format(
-      isMuted and "ON" or "OFF", 
+    local bubbleStatus = GetBubbleStatusSummary()
+    print(("MuteValeera Status - Mute: %s, Critical: %s, Bubbles: %s, Strategy: %s, Dundun: %s, Nanea: %s, In delve: %s, Total sounds: %d"):format(
+      isMuted and "ON" or "OFF",
       muteCritical and "YES" or "NO",
+      bubbleStatus.enabled,
+      bubbleStatus.strategy,
+      muteDundun and "ON" or "OFF",
+      muteNanea and "ON" or "OFF",
+      bubbleStatus.delve,
       isMuted and muteCount or 0
     ))
     return
-    
+
+  elseif cmd == "bubbles" then
+    local bubbleCmd = args[2] and string.lower(args[2]) or "status"
+    local bubbleStatus = GetBubbleStatusSummary()
+
+    if bubbleCmd == "on" then
+      settings.muteBubbles, muteBubbles = true, true
+      RefreshBubbleState("slash-bubbles-on")
+      bubbleStatus = GetBubbleStatusSummary()
+      print(("MuteValeera: Speech bubble suppression enabled. Active strategy: %s."):format(bubbleStatus.strategy))
+      return
+
+    elseif bubbleCmd == "off" then
+      settings.muteBubbles, muteBubbles = false, false
+      RefreshBubbleState("slash-bubbles-off")
+      print("MuteValeera: Speech bubble suppression disabled.")
+      return
+
+    elseif bubbleCmd == "toggle" then
+      muteBubbles = not muteBubbles
+      settings.muteBubbles = muteBubbles
+      RefreshBubbleState("slash-bubbles-toggle")
+      bubbleStatus = GetBubbleStatusSummary()
+      print(("MuteValeera: Speech bubble suppression %s. Active strategy: %s."):format(
+        muteBubbles and "enabled" or "disabled",
+        bubbleStatus.strategy
+      ))
+      return
+
+    elseif bubbleCmd == "status" then
+      print(("MuteValeera Bubble Status - Enabled: %s, Strategy: %s, In delve: %s"):format(
+        bubbleStatus.enabled,
+        bubbleStatus.strategy,
+        bubbleStatus.delve
+      ))
+      return
+    end
+
+    print(("MuteValeera: Unknown bubbles command '%s'"):format(bubbleCmd))
+    print("  Use '/mutevaleera bubbles on', 'off', 'toggle', or 'status'")
+    return
+
+  elseif cmd == "dundun" then
+    local subCmd = args[2] and string.lower(args[2]) or "status"
+
+    if subCmd == "on" then
+      settings.muteDundun, muteDundun = true, true
+      print("MuteValeera: Dundun muted.")
+    elseif subCmd == "off" then
+      settings.muteDundun, muteDundun = false, false
+      print("MuteValeera: Dundun unmuted.")
+    elseif subCmd == "toggle" then
+      muteDundun = not muteDundun
+      settings.muteDundun = muteDundun
+      print(("MuteValeera: Dundun mute toggled %s"):format(muteDundun and "ON" or "OFF"))
+    elseif subCmd == "status" then
+      print(("MuteValeera Dundun: %s"):format(muteDundun and "ON" or "OFF"))
+      return
+    else
+      print(("MuteValeera: Unknown dundun command '%s'"):format(subCmd))
+      print("  Use '/mutevaleera dundun on', 'off', 'toggle', or 'status'")
+      return
+    end
+
+  elseif cmd == "nanea" then
+    local subCmd = args[2] and string.lower(args[2]) or "status"
+
+    if subCmd == "on" then
+      settings.muteNanea, muteNanea = true, true
+      print("MuteValeera: Nanea muted.")
+    elseif subCmd == "off" then
+      settings.muteNanea, muteNanea = false, false
+      print("MuteValeera: Nanea unmuted.")
+    elseif subCmd == "toggle" then
+      muteNanea = not muteNanea
+      settings.muteNanea = muteNanea
+      print(("MuteValeera: Nanea mute toggled %s"):format(muteNanea and "ON" or "OFF"))
+    elseif subCmd == "status" then
+      print(("MuteValeera Nanea: %s"):format(muteNanea and "ON" or "OFF"))
+      return
+    else
+      print(("MuteValeera: Unknown nanea command '%s'"):format(subCmd))
+      print("  Use '/mutevaleera nanea on', 'off', 'toggle', or 'status'")
+      return
+    end
+
   elseif cmd == "add" then
     if rest == "" then
       print("MuteValeera: Please specify sound IDs to add")
@@ -689,6 +1157,8 @@ local function HandleSlashCommand(msg)
   elseif cmd == "help" or cmd == "" then
     print("MuteValeera Commands:")
     print("  Basic: on | off | toggle | full | partial | status")
+    print("  Bubbles: bubbles on | bubbles off | bubbles toggle | bubbles status")
+    print("  NPCs: dundun on|off|toggle|status | nanea on|off|toggle|status")
     print("  Custom: add <ids> | del <ids> | list | clear")
     print("  Advanced: validate | export | import <ids> | ui")
     print("  Aliases: /mv = /mutevaleera")
@@ -701,12 +1171,16 @@ local function HandleSlashCommand(msg)
     print("    on | off | toggle - Control muting state")
     print("    full | partial - Include/exclude critical lines")
     print("    status - Show current settings and mute counts")
+    print("    bubbles <mode> - Control speech bubble suppression")
+    print("    dundun on|off|toggle|status - Mute Dundun voice lines")
+    print("    nanea on|off|toggle|status - Mute Nanea voice lines")
     print("  Custom Sound IDs:")
     print("    add <ids> - Add custom sound IDs")
     print("    del <ids> - Remove custom sound IDs")
     print("    list - Show all custom sound IDs")
     print("    clear - Clear all custom IDs (requires confirmation)")
     print("  Advanced:")
+    print("    bubbles on|off|toggle|status - Speech bubble controls")
     print("    validate - Check custom IDs for potential issues")
     print("    export - Copy custom IDs for backup/sharing")
     print("    import <ids> - Import custom IDs from string")
@@ -714,6 +1188,7 @@ local function HandleSlashCommand(msg)
     print("  Examples:")
     print("    /mutevaleera add 12345,67890")
     print("    /mutevaleera add 12345 67890 11111")
+    print("    /mutevaleera bubbles toggle")
     print("    /mv toggle")
     print("    /mutevaleera import 12345,67890,11111")
     return
@@ -725,6 +1200,7 @@ local function HandleSlashCommand(msg)
   end
 
   ApplyMuteState()
+  RefreshBubbleState("command")
 end
 
 -- Register slash command
@@ -799,7 +1275,7 @@ local function RegisterSettings()
     -- Description
     local desc = panel:CreateFontString(nil, "ARTWORK", "GameFontHighlight")
     desc:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -8)
-    desc:SetText("Silences Valeera Sanguinar's repetitive delve companion voice lines.")
+    desc:SetText("Silences Valeera Sanguinar's repetitive delve companion voice lines and can suppress her speech bubbles in delves.")
     desc:SetJustifyH("LEFT")
     desc:SetWidth(500)
     
@@ -807,7 +1283,7 @@ local function RegisterSettings()
     local function CreateCheckbox(parent, anchor, label, descText, getFunc, setFunc)
       local container = CreateFrame("Frame", nil, parent)
       container:SetPoint("TOPLEFT", anchor, "BOTTOMLEFT", 0, -16)
-      container:SetSize(500, 40)
+      container:SetSize(500, 52)
       
       local cb = CreateFrame("CheckButton", nil, container, "UICheckButtonTemplate")
       cb:SetPoint("TOPLEFT", 0, 0)
@@ -852,12 +1328,25 @@ local function RegisterSettings()
         settings.isMuted = val
         isMuted = val
         ApplyMuteState()
+        RefreshBubbleState("settings-sound-toggle")
+      end
+    )
+
+    local bubbleCheck = CreateCheckbox(
+      panel, muteCheck,
+      "Mute Valeera speech bubbles",
+      "Attempts to hide Valeera's speech bubbles. If selective hiding is unavailable on this client, the addon hides world chat bubbles while you are in delves and restores your previous setting outside.",
+      function() return settings.muteBubbles end,
+      function(val)
+        settings.muteBubbles = val
+        muteBubbles = val
+        RefreshBubbleState("settings-bubbles-toggle")
       end
     )
     
     -- Mute Critical Lines checkbox
     local criticalCheck = CreateCheckbox(
-      panel, muteCheck,
+      panel, bubbleCheck,
       "Also mute critical/important lines",
       "Include critical gameplay-related voice lines (e.g., boss warnings) in muting.",
       function() return settings.muteCritical end,
@@ -868,9 +1357,35 @@ local function RegisterSettings()
       end
     )
     
+    -- Mute Dundun checkbox
+    local dundunCheck = CreateCheckbox(
+      panel, criticalCheck,
+      "Mute Dundun voice lines",
+      "Silence Dundun (rat companion) in Abundance events and other content.",
+      function() return settings.muteDundun end,
+      function(val)
+        settings.muteDundun = val
+        muteDundun = val
+        ApplyMuteState()
+      end
+    )
+
+    -- Mute Nanea checkbox
+    local naneaCheck = CreateCheckbox(
+      panel, dundunCheck,
+      "Mute Nanea voice lines",
+      "Silence Loa Speaker Nanea Revantusk in Nalorakk's Den.",
+      function() return settings.muteNanea end,
+      function(val)
+        settings.muteNanea = val
+        muteNanea = val
+        ApplyMuteState()
+      end
+    )
+
     -- Custom Sound IDs section
     local customHeader = panel:CreateFontString(nil, "ARTWORK", "GameFontNormal")
-    customHeader:SetPoint("TOPLEFT", criticalCheck, "BOTTOMLEFT", 0, -20)
+    customHeader:SetPoint("TOPLEFT", naneaCheck, "BOTTOMLEFT", 0, -20)
     customHeader:SetText("Custom Sound IDs")
     
     local customDesc = panel:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
@@ -1015,18 +1530,41 @@ end
 local eventFrame = CreateFrame("Frame")
 eventFrame:RegisterEvent("ADDON_LOADED")
 eventFrame:RegisterEvent("PLAYER_LOGIN")
+eventFrame:RegisterEvent("PLAYER_ENTERING_WORLD")
+eventFrame:RegisterEvent("ZONE_CHANGED_NEW_AREA")
+eventFrame:RegisterEvent("SCENARIO_UPDATE")
+eventFrame:RegisterEvent("SCENARIO_CRITERIA_UPDATE")
+eventFrame:RegisterEvent("PLAYER_LOGOUT")
+eventFrame:RegisterEvent("CVAR_UPDATE")
 
 eventFrame:SetScript("OnEvent", function(self, event, addonName)
   if event == "ADDON_LOADED" and addonName == ADDON_NAME then
     InitializeSettings()
     ApplyMuteState()
+    RefreshBubbleState("addon-loaded")
     
   elseif event == "PLAYER_LOGIN" then
+    UpdateDelveState()
+    RefreshBubbleState("player-login")
     C_Timer.After(1, function()
       RegisterSettings()
     end)
     
     self:UnregisterEvent("ADDON_LOADED")
     self:UnregisterEvent("PLAYER_LOGIN")
+
+  elseif event == "PLAYER_ENTERING_WORLD" or event == "ZONE_CHANGED_NEW_AREA" or event == "SCENARIO_UPDATE" or event == "SCENARIO_CRITERIA_UPDATE" then
+    UpdateDelveState()
+    RefreshBubbleState(event)
+
+  elseif event == "CVAR_UPDATE" then
+    local cvarName = string.lower(tostring(addonName or ""))
+    if not suppressOwnCVarUpdate and cvarName == string.lower(CHAT_BUBBLE_CVAR) and activeBubbleStrategy == "delve-wide" then
+      ApplyDelveWideBubbleFallback()
+    end
+
+  elseif event == "PLAYER_LOGOUT" then
+    StopSelectiveBubbleSuppression()
+    RestoreBubbleCVars()
   end
 end)

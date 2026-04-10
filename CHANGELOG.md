@@ -2,6 +2,22 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.1.0] - 2026-04-11
+
+### Added
+- **Dundun mute** — 39 verified voice-line IDs (`dundun_rat` companion VO + `vo_1200_dundun` Abundance-event VO, builds `12.0.0.63534` and `12.0.0.64741`) added as an individually toggled mute list, enabled by default
+- **Nanea mute** — 33 verified voice-line IDs (Loa Speaker Nanea Revantusk — Nalorakk's Den, builds `12.0.0.63534`, `12.0.0.63854`, and `12.0.0.64741`) added as an individually toggled mute list, enabled by default
+- Slash sub-commands `/mutevaleera dundun on|off|toggle|status` and `/mutevaleera nanea on|off|toggle|status`
+- Per-NPC checkboxes in the settings UI for Dundun and Nanea
+- Optional speech bubble suppression for Valeera, enabled by default alongside voice muting
+- New `/mutevaleera bubbles on|off|toggle|status` slash commands and matching settings panel checkbox
+
+### Changed
+- Settings version migration no longer prints a chat message on login, reload, or zone changes
+- `/mutevaleera status` now reports Dundun and Nanea mute state, speech bubble status, active strategy, and delve state
+- Bubble suppression now prefers locale-independent Valeera-only hiding when the client exposes stable bubble ownership metadata
+- When selective bubble ownership data is unavailable, the addon falls back to hiding world chat bubbles only while the player is confirmed to be inside a delve and restores the prior CVar afterward
+
 ## [1.0.2] - 2026-03-02
 
 ### Fixed

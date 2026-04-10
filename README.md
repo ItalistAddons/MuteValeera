@@ -1,10 +1,11 @@
 # Mute Valeera
 
-Silences Valeera Sanguinar's repetitive delve companion voice lines in World of Warcraft, using the same single-file addon architecture as `MuteRepetitiveBrann`.
+Silences Valeera Sanguinar's repetitive delve companion voice lines in World of Warcraft and can suppress her speech bubbles in delves, using the same single-file addon architecture as `MuteRepetitiveBrann`.
 
 ## Features
 
 - **Selective Muting**: Choose between partial mute and full mute
+- **Speech Bubble Suppression**: Hide Valeera's speech bubbles while muting is active
 - **Custom Sound IDs**: Add your own sound IDs beyond the built-in Valeera list
 - **In-Game Settings Panel**: Open the Blizzard settings category with `/mutevaleera ui`
 - **Slash Commands**: Full command-line control for power users
@@ -22,6 +23,7 @@ Silences Valeera Sanguinar's repetitive delve companion voice lines in World of 
 - Retail Midnight compatible (`## Interface: 120001`)
 - Existing `MuteValeeraSettings` are preserved
 - If the client no longer exposes the sound mute API, the addon warns once and disables muting instead of throwing Lua errors
+- Speech bubble suppression prefers Valeera-only hiding when the client exposes stable bubble ownership data; otherwise it hides world chat bubbles only while you are inside delves and restores your previous setting outside
 
 ## Default Scope
 
@@ -42,6 +44,10 @@ Silences Valeera Sanguinar's repetitive delve companion voice lines in World of 
 - `/mutevaleera full` - Mute critical lines too
 - `/mutevaleera partial` - Allow critical lines
 - `/mutevaleera status` - Show current settings
+- `/mutevaleera bubbles on` - Enable speech bubble suppression
+- `/mutevaleera bubbles off` - Disable speech bubble suppression
+- `/mutevaleera bubbles toggle` - Toggle speech bubble suppression
+- `/mutevaleera bubbles status` - Show bubble suppression status
 - `/mutevaleera ui` - Open settings panel
 
 ### Custom Sound IDs
@@ -62,6 +68,7 @@ Silences Valeera Sanguinar's repetitive delve companion voice lines in World of 
 
 ```text
 /mv on
+/mutevaleera bubbles toggle
 /mutevaleera add 12345,67890
 /mutevaleera add 111 222 333
 /mv full

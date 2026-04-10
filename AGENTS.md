@@ -12,9 +12,12 @@ This repository contains the World of Warcraft addon `MuteValeera`.
 - For versioned releases, keep the version in `MuteValeera.toc`, the tag, and the changelog aligned.
 - Do not commit packaged zip files, generated release output, WoW SavedVariables backups, or local editor/account state.
 - If you add files that should not ship in the packaged addon, update `.pkgmeta` ignore rules as part of the same change.
-- Keep the built-in mute list limited to Valeera Sanguinar `vo_120` delve-companion voice assets from the Wago Tools `Valeera` file search on pages `9` through `15` that were updated after build `12.0.0.63534`.
-- Use the Wago Tools `Valeera` file search on pages `9` through `15` as the first-pass candidate pool unless the repository owner explicitly expands it.
-- If a Valeera asset is ambiguous or not clearly companion VO, exclude it instead of guessing.
+- Keep the built-in mute lists limited to audited `vo_120` companion voice assets sourced from Wago Tools:
+  - **Valeera** `vo_120` delve-companion VO: Wago Tools `Valeera` file search pages `9` through `15`, updated after build `12.0.0.63534`.
+  - **Dundun** companion and Abundance-event VO: Wago Tools `Dundun` file search, all pages, builds `12.0.0.63534` and `12.0.0.64741`. Confirmed 39 IDs; gaps at `_15` and `_27` are real (absent from the community listfile).
+  - **Nanea** (Loa Speaker Nanea Revantusk — Nalorakk's Den) VO: Wago Tools `Nanea` file search, all pages, builds `12.0.0.63534`, `12.0.0.63854`, and `12.0.0.64741`. Confirmed 33 IDs.
+- Use the Wago Tools `Valeera` file search on pages `9` through `15` as the first-pass candidate pool for Valeera unless the repository owner explicitly expands it.
+- If a Valeera, Dundun, or Nanea asset is ambiguous or not clearly companion VO, exclude it instead of guessing.
 
 ## Release Rules
 
