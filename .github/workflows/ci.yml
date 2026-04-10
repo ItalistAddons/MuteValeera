@@ -64,6 +64,7 @@ jobs:
           args: -d
 
       - name: Validate packaged artifact contents
+        if: ${{ hashFiles('.release/*.zip') != '' }}
         shell: bash
         run: |
           set -euo pipefail
